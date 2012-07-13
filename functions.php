@@ -833,22 +833,8 @@ function CAST_TO_FLOAT($var = 0, $min = NULL, $max = NULL) {
 
  */
 function CAST_TO_BOOL($var = FALSE) {
-  if (is_bool($var)) {
-    return $var;
-  }
-  if ($var === 'n' || $var === '0' || $var === 'no') {
-    return FALSE;
-  }
-  if (is_object($var) || is_array($var)) {
-    return (bool) count($var);
-  }
-  if (is_resource($var)) {
-    return TRUE;
-  }
-  if (is_scalar($var)) {
-    return (bool) trim($var);
-  }
-  return $var ? TRUE : FALSE;
+
+  return (bool) filter_var($var, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
 }
 
 /**
@@ -1941,6 +1927,81 @@ function evalute_php($string, $local_variables = array(), $return = FALSE, &$res
 }
 
 /**
+ * Evalute math expressions, and return calculated in a double format,
+ * or return FALSE if cause a error.
+ *
+ * @param string $math_string
+ * @param string &$sanitized_string
+ *
+ * @return double|FALSE
+ */
+function evalute_math( $string = '', &$sanitized_string = '' ) {
+
+  // Replace next chars with more suitable ones.
+  $string = strtr( $string, array('\\' => '/', ',' => '.', 'x' => '*'));
+
+  // Replace all except numbers and math signs with empty.
+  $string = preg_replace( '#[^0-9\.\+\-\/\*\(\)]#', '', $string );
+
+  $string = trim($string);
+  $string = trim($string, '*/');
+
+  // Remove all duplicating simbols and left the first one.
+  $string = preg_replace( '#([\*\/\+\-])[\*\/\+\-]+#', '\\1', $string );
+
+  $string = preg_replace( '#\s+#', '', $string );
+
+  // Remove all simbols left to closing bracket.
+  $string = preg_replace( '#(\d+)\s*\(#', '\\1*(', $string );
+
+  //Remove all symbols right to closing bracket.
+  $string = preg_replace( '#\)\s*(\d+)#', ')*\\1', $string );
+
+  // Autoclosing missed cloed brackets.
+  $bracket_c = substr_count( $string, ')' );
+  $bracket_o = substr_count( $string, '(' );
+  if ($bracket_c > $bracket_o) {
+    $string = str_repeat('(', $bracket_c-$bracket_o) . $string;
+  }
+  elseif ($bracket_c < $bracket_o) {
+    $string = $string . str_repeat(')', $bracket_o-$bracket_c);
+  }
+
+  // Removing mispeling brackets.
+  $string = preg_replace( '#\(([^0-9(-]+)#', '(', $string );
+  $string = preg_replace( '#([^0-9)]+)\)#', ')', $string );
+
+  // Remove () and )(
+  $string = strtr( $string, array(')(' => '', '()' => ''));
+
+  // Autoclosing missed cloed brackets.
+  $bracket_c = substr_count( $string, ')' );
+  $bracket_o = substr_count( $string, '(' );
+  if ($bracket_c > $bracket_o) {
+    $string = str_repeat('(', $bracket_c-$bracket_o) . $string;
+  }
+  elseif ($bracket_c < $bracket_o) {
+    $string = $string . str_repeat(')', $bracket_o-$bracket_c);
+  }
+
+  $string = @preg_replace_callback( '#([\d.]+)#',
+    create_function('$matches', 'return (float) $matches[0];'),
+    $string );
+
+  $sanitized_string = $string;
+
+  $string = 'return ' . $string . ';';
+
+  $x = @eval( $string );
+
+  if (is_numeric($x)) {
+    return (double) $x;
+  }
+
+  return FALSE;
+}
+
+/**
  * Check if string is compa separated numerics.
  *
  * @param string $string
@@ -2028,12 +2089,12 @@ function is_email($string = '') {
  * Check if string is valid IPv4 address
  *
  * @param string $string
+ * @param bool $ipv6
  *
  * @return bool
  */
-function is_ip($string = '') {
-  return preg_match('#^([1-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])' .
-      '(\.([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])){3}$#', CAST_TO_STRING($string));
+function is_ip($string = '', $ipv6 = FALSE) {
+  return (bool) filter_var( $string, FILTER_VALIDATE_IP, ( $ipv6 ? FILTER_FLAG_IPV6 : FILTER_FLAG_IPV4 ) );
 }
 
 /**

@@ -117,7 +117,7 @@ define('TI_DB',                'mysql:dbname=<database>;host=<host>;username=<us
 //define('TI_DB_CONN2',          'mysql://root@localhost/ti2');
 //define('TI_DB_CONN3',          'interbase://SYS_USER:password@127.0.0.1:c:databases/mydatabase.fbm');
 
-define('TI_DOCUMENTATION',      'README.html'); // call with 'http://example.com/README.html'
+define('TI_DOCUMENTATION',      TRUE); // call with 'http://example.com/?TI_DOCUMENTATION' parameter
 
 
 // ------------------------------------------------------------- //
