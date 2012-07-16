@@ -72,10 +72,6 @@ class Calendar {
   private $events_dates = array();
   private $html = '';
 
-  function __construct() {
-    return $this;
-  }
-
   /**
    * Add event to the calendar.
    *

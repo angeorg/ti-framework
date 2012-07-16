@@ -257,7 +257,7 @@ class Database extends PDO {
 
     $args = array();
     $querystr = 'SELECT';
-    
+
     if (!$columns || $columns == '*') {
         $querystr .= ' * ';
     }
@@ -268,7 +268,7 @@ class Database extends PDO {
         }
         $querystr .= ' ' . implode( ', ', $columns );
     }
-    
+
     $querystr .= ' FROM ' . $table;
 
     if (is_string($condition)) {
@@ -277,9 +277,108 @@ class Database extends PDO {
     else {
         $querystr .= $this->build_keypair_clause($condition, $args, 'WHERE', 'AND');
     }
-    
+
     return $this->query($querystr, $args);
   }
-  
+
 }
 
+/**
+ * Get sql style timestamp
+ *
+ * @param int $timestamp
+ *
+ * @return string
+ */
+function sql_now($timestamp = 0) {
+  return !$timestamp
+    ? date( 'Y-m-d H:i:s' )
+    : date( 'Y-m-d H:i:s', $timestamp );
+}
+
+/**
+ * Get html5 suitable input type from sql column type
+ *
+ * @param string $type
+ *
+ * @return string
+ */
+function sql_type_to_widget( $columntype = '' ) {
+
+  $type = CAST_TO_STRING( $type );
+
+  if ( preg_match('/^(tinyint\(1\)|bool|boolean)/i', $type) ) {
+    return 'BOOLEAN';
+  }
+
+  if ( preg_match('/^(tinyint|mediumint|int|smallint|bigint|numeric|real|double|float)/i', $type)) {
+    return 'NUMBER';
+  }
+
+  if ( preg_match('/^(tinytext|text|mediumtext|longtext)/i', $type) ) {
+    return 'TEXTAREA';
+  }
+
+  if ( preg_match('/^(tinyblob|blob|mediumblob|longblob)/i', $type) ) {
+    return 'FILE';
+  }
+
+  if ( preg_match('/^(timestamp|datetime)/i', $type) ) {
+    return 'DATETIME';
+  }
+
+  if ( preg_match('/^date/i', $type) ) {
+    return 'DATE';
+  }
+
+  if ( preg_match('/^time/i', $type) ) {
+    return 'TIME';
+  }
+
+  if ( preg_match('/^set\(.*\)/i', $type) ) {
+    return 'CHECKBOX';
+  }
+
+  if ( preg_match('/^enum\(.*\)/i', $type) ) {
+    return 'SELECT';
+  }
+
+  return 'TEXT';
+}
+
+/**
+ * Check if string is correct time interval.
+ *
+ * @param string $string
+ *
+ * @return bool
+ */
+function sql_is_time_interval( $string = '' ) {
+  return preg_match( '/^\d{1,3}\s(MINUTE|HOUR|DAY|WEEK|MONTH|YEAR)$/i', CAST_TO_STRING( $string ) )
+    ? TRUE
+    : FALSE;
+}
+
+/**
+ * Get available options in enum/set column type
+ *
+ * @param string $columntype
+ *
+ * @return array
+ */
+function sql_get_enum_values($columntype = '') {
+
+  $type = CAST_TO_STRING($type);
+
+  if ( preg_match('/^set\((.*)\)/i', $type, $matches) || preg_match('/^enum\((.*)\)/i', $type, $matches) ) {
+    if ( count($matches) > 0 ) {
+      $matches = explode( ',', array_pop( $matches ) );
+      foreach($matches as $key => $val) {
+        $matches[$key] = trim( $val, '\'"' );
+      }
+      return $matches;
+    }
+  }
+
+  return array();
+}

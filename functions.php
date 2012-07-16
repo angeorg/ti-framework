@@ -597,6 +597,22 @@ function set_document_downloadable($filename = '', $size = 0) {
 /**
  * Simple HTTP document authorisation
  *
+ * Callback takes two parameters:
+ *   1st - $username
+ *   2nd - $password
+ *   Example:
+ *     document_auth( 'Please authorize!', 'hello_world_auth' );
+ *     function hello_world_auth($user, $pass) {
+ *
+ *       if ($user == 'user1' && $pass == 'pass1') {
+ *         return TRUE;
+ *       }
+ *       else {
+ *         return FALSE;
+ *       }
+ *
+ *     }
+ *
  * @param string $message
  * @param string $callback
  *   callback that check user password
@@ -643,7 +659,7 @@ function document_auth($message = '', $callback = '') {
  *   content or just TRUE
  */
 function document_clean() {
-  if (ob_list_handlers()) {
+  if ( ob_list_handlers() ) {
     return ob_clean();
   }
   return TRUE;
@@ -1124,6 +1140,35 @@ function implode_r($glue = '', $pieces = array()) {
 }
 
 /**
+ * Explode string for a specific number of chunks.
+ * Work like as explode() but instead of $limit, here $elements_number,
+ * means the returner array, always will be $elements_number long.
+ *
+ * @param string $delimeter
+ * @param string $string
+ * @param int $elements_number
+ * @param mixed $default_value
+ *
+ * @return array
+ */
+function explode_n($delimeter = ',', $string = '', $elements_number = 1, $default_value = NULL) {
+
+  $elements_number = CAST_TO_INT( $elements_number, 1 );
+
+  $array = explode( $delimeter, $string, ( $elements_number ? $elements_number : NULL ));
+
+  if ( !$array ) {
+    return array_fill( 0, $elements_number, $default_value_for_nulls );
+  }
+  elseif ( count( $array ) === $elements_number ) {
+    return $array;
+  }
+  else {
+    return array_pad( $array, $elements_number, $default_value );
+  }
+}
+
+/**
  * Recursive copy of directory.
  *
  * @param string $source
@@ -1446,6 +1491,31 @@ function make_hash($string = '') {
   }
 
   return md5( TI_APP_SECRET . str_rot13(CAST_TO_STRING($string)) );
+}
+
+/**
+ * Computes a Hash-based Message Authentication Code (HMAC) using the SHA1 hash function.
+ *
+ * @param string $key
+ * @param string $data
+ *
+ * @return string
+ */
+function hmacsha1($key = '', $data = '') {
+
+  $blocksize = 64;
+  $hashfunc = 'sha1';
+
+  if ( strlen($key) > $blocksize ) {
+    $key=pack( 'H*', $hashfunc($key) );
+  }
+
+  $key=str_pad( $key, $blocksize,chr( 0x00 ) );
+  $ipad = str_repeat( chr( 0x36 ), $blocksize );
+  $opad = str_repeat( chr( 0x5c ), $blocksize );
+  $hmac = pack( 'H*', $hashfunc( ($key^$opad) . pack( 'H*', $hashfunc( ($key^$ipad) . $data ) ) ) );
+
+  return $hmac;
 }
 
 /**
