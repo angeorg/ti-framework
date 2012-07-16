@@ -40,23 +40,25 @@ class Image {
   private $im = NULL;
   private $quality = 85;
 
-  function __construct() {
+  public function __construct() {
     $this->im = NULL;
   }
 
-  function __destruct() {
+  public function __destruct() {
     unset($this->im);
   }
 
-  function set_quality($quality) {
+  public function set_quality($quality) {
     $this->quality = CAST_TO_INT($quality);
   }
 
-  function set_font($file = '') {
-    if (is_readable($file))
+  public function set_font($file = '') {
+    if (is_readable($file)) {
       $this->font = realpath($file);
-    else
+    }
+    else {
       $this->font = '';
+    }
   }
 
   function load_from_file($filename) {
@@ -253,16 +255,33 @@ class Image {
     return TRUE;
   }
 
+  /**
+   * Scale the image
+   *
+   * @param int $scale
+   * @param bool $preserve_smaller
+   */
   function scale($scale = '100', $preserve_smaller = FALSE) {
     $width = imagesx($this->im) * $scale / 100;
     $height = imagesy($this->im) * $scale / 100;
-    return resize($width, $height, $preserve_smaller);
+    return $this->resize($width, $height, $preserve_smaller);
   }
 
+  /**
+   * Rotate the image.
+   *
+   * @param int $rotate
+   */
   function rotate($rotate = 90) {
     $this->im = imagerotate($this->im, CAST_TO_INT($rotate), 0);
   }
 
+
+  /**
+   * Add wattermark to the iamge.
+   *
+   * @param 
+   */
   function wattermark($image, $text = 'Wattermark', $fontsize = 18, $file = FALSE, $position = 'RIGHT BOTTOM') {
     if ($file && is_readable($file)) {
       $wattermark = imagecreatefrompng($file);
@@ -315,26 +334,53 @@ class Image {
     return FALSE;
   }
 
-  function to_ascii() {
+  /**
+   * Convert current image to ascii.
+   *
+   * @param bool $binary
+   *    create 1010 like ascii
+   *
+   * @return string
+   */
+  function to_ascii($binary = TRUE) {
+  
     $text = '';
     $width = imagesx($this->im);
     $height = imagesy($this->im);
 
     for ($h = 1; $h < $height; $h++) {
+    
       for ($w = 1; $w <= $width; $w++) {
+      
         $rgb = imagecolorat($this->im, $w, $h);
         $r = ($rgb >> 16) & 0xFF;
         $g = ($rgb >> 8) & 0xFF;
         $b = $rgb & 0xFF;
 
-        $hex = '#' . str_pad(dechex($r), 2, '0', STR_PAD_LEFT) . str_pad(dechex($g), 2, '0', STR_PAD_LEFT) . str_pad(dechex($b), 2, '0', STR_PAD_LEFT);
+        if ($binary) {
+          $hex = '#' . str_pad( dechex( $r ), 2, '0', STR_PAD_LEFT )
+                     . str_pad( dechex( $g ), 2, '0', STR_PAD_LEFT )
+                     . str_pad( dechex( $b ), 2, '0', STR_PAD_LEFT );
 
-        if ($w == $width)
-          $text .= '<br>';
-        else
-          $text .= '<span style="color:' . $hex . ';">#</span>';
+          if ($w == $width) {
+            $text .= '<br />';
+          }
+          else {
+            $text .= '<span style="color:' . $hex . ';">#</span>';
+          }
+        }
+        else {
+          if ( $r + $g + $b > 382 ) {
+            $text .= '0';
+          }
+          else {
+            $text .= '1';
+          }
+        }
       }
+      
     }
+    
     return $text;
   }
 

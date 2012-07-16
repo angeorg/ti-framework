@@ -36,112 +36,180 @@ if (!defined('TI_PATH_FRAMEWORK'))
 
 class Pagination {
 
-  private $config = array();
+  /**
+   * Current page
+   */
+  public $current_page = 1;
+  
+  /**
+   * Total num of records to paginate
+   */
+  public $total_rows = 100;
+  
+  /**
+   * How many per page to show
+   */
+  public $per_page = 20;
+  
+  /**
+   * Base url, printf format
+   */
+  public $base_url = '';
+  
+  /**
+   * How many cells to show
+   */
+  public $size = 10;
+  
+  /**
+   * Format of normal cell (printf format)
+   */
+  public $html_cell_normal = '<a href="%s">%s</a>';
 
+  /**
+   * Format of active cell (printf format)
+   */
+  public $html_cell_active = '<a href="%s" class="active">%s</a>';
+
+  /**
+   * Format of first cell (printf format)
+   */
+  public $html_cell_first = '<a href="%s">&#8592;</a>';
+
+  /**
+   * Format of last cell (printf format)
+   */
+  public $html_cell_last = '<a href="%s">&#8594;</a>';
+
+  /**
+   * Format of wrapper (printf format)
+   */
+  public $html_wrapper = '<div class="pagination">%s</div>';
+
+  private $html = '';
+
+  /**
+   * Constructor, if array or object is passed, then initialize the object with vals.
+   *
+   * @param mixed
+   *
+   * @return Pagination
+   */
   function __construct($config = array()) {
-
-    $this->config = array_model(array(
-        'current_page' => 'INT|1',
-        'total_entries' => 'INT|100',
-        'per_page' => 'INT|20',
-        'base_url' => 'STRING',
-        'size' => 'INT|10',
-        'html_cell_normal' => 'STRING|<a href="%s">%s</a>',
-        'html_cell_active' => 'STRING|<a href="%s" class="active">%s</a>',
-        'html_cell_first' => 'STRING|<a href="%s">&#8592;</a>',
-        'html_cell_last' => 'STRING|<a href="%s">&#8594;</a>',
-        'html_wrapper' => 'STRING|<div class="pagination">%s</div>'
-            ), $config);
+    if ( $config ) {
+      foreach ( CAST_TO_ARRAY( $config ) as $key => $val ) {
+        if ( isset($this->{$key}) ) {
+          $this->{$key} = $val;
+        }
+      }
+    }
+    return $this;
   }
 
-  public function __set($key, $val = FALSE) {
-    $key = CAST_TO_STRING($key);
-
-    if (isset($this->config[$key]))
-      return $this->config[$key] = $val;
-    return FALSE;
-  }
-
-  public function __get($key) {
-    $key = CAST_TO_STRING($key);
-
-    if (isset($this->config[$key]))
-      return $this->config[$key];
-    return FALSE;
-  }
-
+  /**
+   * Generate the paginator
+   *
+   * @return Pagination
+   */
   public function generate() {
-    $config_array = & $this->config;
-
-    if ($config_array['per_page'] >= $config_array['total_entries'])
+  
+    if ( $this->per_page >= $this->total_rows ) {
       return FALSE;
+    }
 
     $html = '';
 
-    $config_array['per_page'] = CAST_TO_INT($config_array['per_page'], 1);
+    $this->per_page = CAST_TO_INT($this->per_page, 1);
 
-    $page_num_last = ceil($config_array['total_entries'] / $config_array['per_page']);
+    $page_num_last = ceil( $this->total_rows / $this->per_page );
 
-    if ($config_array['current_page'] > $page_num_last)
-      $config_array['current_page'] = $page_num_last;
-    elseif ($config_array['current_page'] < 1)
-      $config_array['current_page'] = 1;
+    if ( $this->current_page > $page_num_last ) {
+      $this->current_page = $page_num_last;
+    }
+    elseif ($this->current_page < 1) {
+      $this->current_page = 1;
+    }
 
-    $page_num_prev = $config_array['current_page'] > 1 ? $config_array['current_page'] - 1 : 1;
-    $page_num_next = $config_array['current_page'] < $page_num_last ? $config_array['current_page'] + 1 : $page_num_last;
+    $page_num_prev = $this->current_page > 1 ? $this->current_page - 1 : 1;
+    $page_num_next = $this->current_page < $page_num_last ? $this->current_page + 1 : $page_num_last;
 
-    if ($config_array['size']) {
-      $half_size = floor($config_array['size'] / 2);
+    if ( $this->size ) {
+      $half_size = floor($this->size / 2);
 
-      $even = $config_array['size'] % 2 ? 1 : 0;
+      $even = $this->size % 2 ? 1 : 0;
 
-      $for_loops = $config_array['current_page'] + $half_size + $even;
-      $i = $config_array['current_page'] - $half_size + 1;
+      $for_loops = $this->current_page + $half_size + $even;
+      $i = $this->current_page - $half_size + 1;
 
-      if ($config_array['current_page'] - $half_size < 1) {
-        $for_loops = $config_array['size'];
+      if ($this->current_page - $half_size < 1) {
+        $for_loops = $this->size;
         $i = 1;
       }
 
       if ($for_loops > $page_num_last) {
         $for_loops = $page_num_last;
-        $i = $page_num_last - $config_array['size'] + 1;
+        $i = $page_num_last - $this->size + 1;
       }
 
-      if ($i < 1)
+      if ($i < 1) {
         $i = 1;
+      }
     }
     else {
       $for_loops = $page_num_last;
       $i = 1;
     }
 
-    if ($config_array['current_page'] > 1) {
-      if ($config_array['html_cell_first'])
-        $html .= sprintf($config_array['html_cell_first'], site_url(sprintf($config_array['base_url'], 1)));
+    if ( $this->current_page > 1 ) {
+      if ( $this->html_cell_first ) {
+        $html .= sprintf( $this->html_cell_first, site_url( sprintf( $this->base_url, 1 ) ) );
+      }
     }
 
     for ($s = 1; $i <= $for_loops; $i++, $s++) {
-      $uri = site_url(sprintf($config_array['base_url'], $i));
+      $uri = site_url( sprintf( $this->base_url, $i ) );
 
-      if ($config_array['current_page'] == $i)
-        $html .= sprintf($config_array['html_cell_active'], $uri, $i);
-      else
-        $html .= sprintf($config_array['html_cell_normal'], $uri, $i);
+      if ($this->current_page == $i) {
+        $html .= sprintf( $this->html_cell_active, $uri, $i );
+      }
+      else {
+        $html .= sprintf( $this->html_cell_normal, $uri, $i );
+      }
     }
 
-    if ($page_num_last > $config_array['current_page']) {
-      if ($config_array['html_cell_last'])
-        $html .= sprintf($config_array['html_cell_last'], site_url(sprintf($config_array['base_url'], $page_num_last)));
+    if ( $page_num_last > $this->current_page ) {
+      if ( $this->html_cell_last ) {
+        $html .= sprintf( $this->html_cell_last, site_url( sprintf( $this->base_url, $page_num_last ) ) );
+      }
     }
 
-    if (!$html)
+    if ( !$html ) {
       return '';
+    }
 
-    if ($config_array['html_wrapper'])
-      $html = sprintf($config_array['html_wrapper'], $html);
+    if ( $this->html_wrapper ) {
+      $html = sprintf( $this->html_wrapper, $html );
+    }
 
-    return $html;
+    $this->html = $html;
+    
+    return $this;
+  }
+
+  /**
+   * Output the generated calendar html.
+   */
+  public function show() {
+    echo $this->html;
+  }
+
+  /**
+   * Return the generated calendar html.
+   *
+   * @return string
+   */
+  public function get_html() {
+    return $this->html;
   }
 
 }

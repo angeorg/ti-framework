@@ -77,6 +77,8 @@ function mbus($text = '') {
 /**
  * PDO accesspoint.
  *
+ * @fire pdo_options
+ *
  * @param string TI_DB_<ID>
  *   default is empty, pointing to the TI_DB configuration
  *
@@ -126,6 +128,7 @@ function db($db_id = '') {
             && isset($cred['charset'])) {
           $options[PDO::MYSQL_ATTR_INIT_COMMAND] = 'SET NAMES ' . $cred['charset'];
         }
+        $options = do_hook( 'pdo_options', $options, $cred, $driver );
         $databases[$hash] = new Database( $dsn, $username, $password, $options );
         $databases[$hash]->prefix = $prefix;
         return $databases[$hash];
@@ -155,10 +158,12 @@ function is_cli() {
 /**
  * Is the application run from ajax query
  *
+ * @fire is_ajax
+ *
  * @return bool
  */
 function is_ajax() {
-  return TI_IS_AJAX;
+  return do_hook( __FUNCTION__, TI_IS_AJAX );
 }
 
 /**
@@ -172,6 +177,7 @@ function ip() {
 
 /**
  * TI's class autoloader function.
+ *
  * @fire __autoload
  *
  * @param string $Library
@@ -198,6 +204,7 @@ function ti_autoloader($Library = '') {
 
 /**
  * Is access from mobile device?
+ *
  * @fire is_mobile
  *
  * @return bool
@@ -229,6 +236,7 @@ function is_mobile() {
 
 /**
  * Check for matching the URL on parameter
+ *
  * @fire match_url
  *
  * @param string $url
@@ -462,6 +470,7 @@ function load_locale($Locale = '') {
 
 /**
  * Get string translation
+ *
  * @fire __
  *
  * @param string $string
@@ -514,7 +523,7 @@ function elapsed_time() {
  * @return double
  */
 function memory_usage() {
-  return memory_get_usage(TRUE);
+  return memory_get_usage( TRUE );
 }
 
 /**
@@ -523,7 +532,7 @@ function memory_usage() {
  * @return bool
  */
 function set_document_html() {
-  if (headers_sent()) {
+  if ( headers_sent() ) {
     return FALSE;
   }
   header( 'Content-type: text/html; charset=UTF-8;', TRUE );
@@ -560,7 +569,7 @@ function set_document_downloadable($filename = '', $size = 0) {
     return FALSE;
   }
 
-  $filename = CAST_TO_STRING($filename);
+  $filename = sanitize_string( CAST_TO_STRING( $filename ) );
 
   if ( is_readable($filename) ) {
     $size = filesize( $filename );
@@ -603,10 +612,7 @@ function document_auth($message = '', $callback = '') {
 
   $success = FALSE;
 
-  if (
-      $callback && is_callable( $callback ) && isset( $_SERVER['PHP_AUTH_USER'] ) && isset( $_SERVER['PHP_AUTH_PW'] )
-      && $_SERVER['PHP_AUTH_USER'] && $_SERVER['PHP_AUTH_PW']
-  ) {
+  if (is_callable( $callback ) && !empty( $_SERVER['PHP_AUTH_USER'] ) && !empty( $_SERVER['PHP_AUTH_PW'] )) {
     $success = $callback(
         string_sanitize( CAST_TO_STRING( $_SERVER['PHP_AUTH_USER'] ) ), string_sanitize( CAST_TO_STRING( $_SERVER['PHP_AUTH_PW'] ) ) );
     unset( $_SERVER['PHP_AUTH_USER'], $_SERVER['PHP_AUTH_PW'] );
@@ -1252,31 +1258,33 @@ function is_serialized($data) {
  */
 function filemime($file = '', $fallback_type = 'application-octet/stream') {
 
-  if (function_exists('finfo_open')) {
-    $finfo = finfo_open(FILEINFO_MIME);
-    $mimetype = finfo_file($finfo, $file);
-    finfo_close($finfo);
-    $mimetype = explode(';', $mimetype);
-    return array_shift($mimetype);
+  if (function_exists( 'finfo_open' ) ) {
+    $finfo = finfo_open( FILEINFO_MIME );
+    $mimetype = finfo_file( $finfo, $file );
+    finfo_close( $finfo );
+    $mimetype = explode( ';', $mimetype );
+    return array_shift( $mimetype );
   }
-  elseif (function_exists('mime_content_type')) {
-    return mime_content_type($file);
+  elseif (function_exists( 'mime_content_type' )) {
+    return mime_content_type( $file );
   }
   else {
-    $it = exif_imagetype($file);
+    $it = exif_imagetype( $file );
     if ($it) {
-      return image_type_to_mime_type($it);
+      return image_type_to_mime_type( $it );
     }
     elseif (PHP_OS !== 'Windows') {
       return exec('file -b --mime-type "' . escapeshellcmd( CAST_TO_STRING($file) ) . '"');
     }
   }
-  return 'application-octet/stream';
+  return $fallback_type;
 }
 
 /**
- * Send mail based on php's mail() function.
- * @fire send_mail
+ * Send mail based on php's mail() function, or custom one if hook send_mail_function is implemented
+
+ * @fire send_mail_headers
+ * @fire send_mail_function
  *
  * @param string $to
  * @param string $subject
@@ -1297,7 +1305,7 @@ function send_mail($to = '', $subject = '(No subject)', $message = '', $header =
   ifsetor($header['Content-Transfer-Encoding'], '8bit');
   ifsetor($header['X-Mailer'], 'PHP-' . phpversion());
 
-  $headers = do_hook( __FUNCTION__, $headers );
+  $headers = do_hook( 'send_mail_headers', $headers );
 
   $header_ = '';
   foreach ($header as $key => $val) {
@@ -1306,12 +1314,17 @@ function send_mail($to = '', $subject = '(No subject)', $message = '', $header =
 
   unset($header);
 
-  return mail( $to, '=?UTF-8?B?' . base64_encode($subject) . '?=', $message, $header_ );
+  $send_mail_fn = 'mail';
+
+  $send_mail_fn = do_hook( 'send_mail_function', $send_mail_fn );
+
+  return $send_mail_fn( $to, '=?UTF-8?B?' . base64_encode($subject) . '?=', $message, $header_ );
 }
 
 /**
  * Perform a http request.
- * @fire http_query
+ *
+ * @fire http_query_headers
  *
  * @param string $url
  * @param string $type
@@ -1343,10 +1356,10 @@ function http_query($url, $type = 'GET', $data = NULL, &$header = '', $timeout =
     }
   }
   else {
-    $data = CAST_TO_ARRAY($data);
-    $query['query'] = array_merge($data2, $data);
+    $data = CAST_TO_ARRAY( $data );
+    $query['query'] = array_merge( $data2, $data );
     unset($data, $data2);
-    $query['query'] = http_build_query($query['query'], NULL, '&');
+    $query['query'] = http_build_query( $query['query'], NULL, '&' );
   }
 
   if (!in_array($type, array('GET', 'POST', 'OPTIONS'))) {
@@ -1371,7 +1384,7 @@ function http_query($url, $type = 'GET', $data = NULL, &$header = '', $timeout =
       $headers['Content-length'] = strlen( $query['query'] );
     }
 
-    $headers = do_hook( __FUNCTION__, $headers, $query );
+    $headers = do_hook( 'http_query_headers', $headers, $query );
 
     foreach ($headers as $key => $val) {
       fputs( $fp, $key . ': ' . $val . "\r\n" );
@@ -1899,7 +1912,7 @@ function do_clickable($text = '', $anchor_length = 40) {
  * @param string $html
  */
 function strip_attributes($html = '') {
-  return preg_replace('/<\s*([a-z]+)([^>]*)>/i', '<//1>', $html);
+  return preg_replace( '/<\s*([a-z]+)([^>]*)>/i', '<//1>', $html );
 }
 
 /**
@@ -1913,13 +1926,13 @@ function strip_attributes($html = '') {
  */
 function evalute_php($string, $local_variables = array(), $return = FALSE, &$result = NULL) {
 
-  if ($return) {
+  if ( $return ) {
     ob_start();
   }
-  extract(CAST_TO_ARRAY($local_variables));
-  unset($local_variables);
+  extract( CAST_TO_ARRAY($local_variables) );
+  unset( $local_variables );
 
-  $result = eval('error_reporting(' . CAST_TO_INT(DEBUG_MODE) . ');?>' . $string . '<?php ');
+  $result = eval( 'error_reporting(' . CAST_TO_INT(DEBUG_MODE) . ');?>' . $string . '<?php ');
 
   if ($return) {
     return ob_get_clean();
@@ -1943,8 +1956,8 @@ function evalute_math( $string = '', &$sanitized_string = '' ) {
   // Replace all except numbers and math signs with empty.
   $string = preg_replace( '#[^0-9\.\+\-\/\*\(\)]#', '', $string );
 
-  $string = trim($string);
-  $string = trim($string, '*/');
+  $string = trim( $string );
+  $string = trim( $string, '*/' );
 
   // Remove all duplicating simbols and left the first one.
   $string = preg_replace( '#([\*\/\+\-])[\*\/\+\-]+#', '\\1', $string );
@@ -1978,23 +1991,24 @@ function evalute_math( $string = '', &$sanitized_string = '' ) {
   $bracket_c = substr_count( $string, ')' );
   $bracket_o = substr_count( $string, '(' );
   if ($bracket_c > $bracket_o) {
-    $string = str_repeat('(', $bracket_c-$bracket_o) . $string;
+    $string = str_repeat( '(', $bracket_c-$bracket_o ) . $string;
   }
   elseif ($bracket_c < $bracket_o) {
     $string = $string . str_repeat(')', $bracket_o-$bracket_c);
   }
 
   $string = @preg_replace_callback( '#([\d.]+)#',
-    create_function('$matches', 'return (float) $matches[0];'),
+    create_function( '$matches', 'return (float) $matches[0];' ),
     $string );
 
   $sanitized_string = $string;
 
   $string = 'return ' . $string . ';';
 
+  // Evalute the sanitized math expression.
   $x = @eval( $string );
 
-  if (is_numeric($x)) {
+  if ( is_numeric($x) ) {
     return (double) $x;
   }
 
@@ -2289,9 +2303,9 @@ function human_to_path($string = '') {
  * @return array
  */
 function path_to_assoc($path = '', $offset = 0) {
-  $array = trim(preg_replace('/\/{2,}/', '/', $path), '/ \\');
+  $array = trim( preg_replace( '#\/{2,}#', '/', $path ), '/ \\' );
   if ($offset) {
-    $array = array_splice($array, $offset);
+    $array = array_splice( $array, $offset );
   }
   $assoc_array = array();
   while ( $array ) {
@@ -2470,6 +2484,7 @@ function num_to_month($num = 0, $long_names = FALSE) {
 
 /**
  * TI-framework transliteration implementation.
+ *
  * @fire transliterate
  *
  * @param string $string
@@ -2503,7 +2518,7 @@ function transliterate($string = '', $from_latin = FALSE) {
   $ctable = do_hook( __FUNCTION__, $ctable );
 
   if ( $from_latin ) {
-    array_flip($ctable);
+    array_flip( $ctable );
   }
 
   return strtr( $string, $ctable );

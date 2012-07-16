@@ -1,7 +1,7 @@
 <?php
 
 /**
- * library.Database.php - Database PDO extended driver Application::db()
+ * library.Database.php - Database PDO extended driver db()
  *
  * Copyright (c) 2012, e01 <dimitrov.adrian@gmail.com>
  * All rights reserved.
@@ -244,4 +244,42 @@ class Database extends PDO {
     }
   }
 
+  /**
+   * Retrieve records from table.
+   *
+   * @param string $table
+   * @param array $columns
+   * @param mixed $condition
+   *
+   * @return array
+   */
+  function select($table = '', $columns = array(), $condition = array()) {
+
+    $args = array();
+    $querystr = 'SELECT';
+    
+    if (!$columns || $columns == '*') {
+        $querystr .= ' * ';
+    }
+    else {
+        $columns = CAST_TO_ARRAY( $columns );
+        foreach ( $columns as &$col ) {
+            $col = $this->db_squote( $col );
+        }
+        $querystr .= ' ' . implode( ', ', $columns );
+    }
+    
+    $querystr .= ' FROM ' . $table;
+
+    if (is_string($condition)) {
+        $querystr .= ' WHERE ' . $condition;
+    }
+    else {
+        $querystr .= $this->build_keypair_clause($condition, $args, 'WHERE', 'AND');
+    }
+    
+    return $this->query($querystr, $args);
+  }
+  
 }
+

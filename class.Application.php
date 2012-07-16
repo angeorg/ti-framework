@@ -50,13 +50,13 @@ function _ti_application_find_routes_fd($adir, $rdir = '') {
   if ( is_dir( $adir ) ) {
     $handle = opendir( $adir );
     if ( $handle ) {
-      while ( FALSE !== ($file = readdir($handle)) ) {
+      while ( FALSE !== ($file = readdir( $handle )) ) {
         if ( $file{0} !== '.' ) {
-          if ( is_dir($adir . '/' . $file) ) {
+          if ( is_dir( $adir . '/' . $file ) ) {
             $files = array_merge( $files, _ti_application_find_routes_fd( $adir . '/' . $file, $rdir . '/' . $file ) );
           }
-          elseif ( substr($file, TI_EXT_CONTROLLER_N) === TI_EXT_CONTROLLER ) {
-            $files[] = $rdir . '/' . substr($file, 0, TI_EXT_CONTROLLER_N);
+          elseif ( substr( $file, TI_EXT_CONTROLLER_N ) === TI_EXT_CONTROLLER ) {
+            $files[] = $rdir . '/' . substr( $file, 0, TI_EXT_CONTROLLER_N );
           }
         }
       }
@@ -84,7 +84,7 @@ function _ti_application_routes() {
     asort( $routes );
 
     if ( TI_RULES_CACHE ) {
-      cache_put( 'ti://rules-cache', implode("\n", $routes) );
+      cache_put( 'ti://rules-cache', implode( "\n", $routes ) );
     }
   }
 
@@ -228,15 +228,30 @@ class Application {
     return self::$variables;
   }
 
-  public function __set($key, $variable = NULL) {
-    return ( self::$variables[$key] = $variable );
+  /**
+   * Magic function that store variables as properties into Application superglobal
+   *
+   * @param string $key
+   * @param mixed $value
+   *
+   * @return bool
+   */
+  public function __set($key, $value = NULL) {
+    return ( self::$variables[$key] = $value );
   }
 
+  /**
+   * Magic function that retrieve  property from Application superglobal
+   *
+   * @param string $key
+   *
+   * @return mixed
+   */
   public function &__get($key) {
-    if ( !isset( self::$variables[$key] ) ) {
-      self::$data[$key] = NULL;
+    if ( isset( self::$variables[$key] ) ) {
+      return self::$data[$key];
     }
-    return self::$data[$key];
+    return NULL;
   }
 
 }

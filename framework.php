@@ -32,7 +32,7 @@
  */
 
 // Set the framework version.
-define( 'TI_FW_VERSION', '0.9.5' );
+define( 'TI_FW_VERSION', '0.9.6' );
 
 // Start the timer.
 define( 'TI_TIMER_START', microtime( TRUE ) );
@@ -119,11 +119,12 @@ if ( defined('TI_DOCUMENTATION') && is_string( TI_DOCUMENTATION ) && strcmp( $_S
 }
 
 // Set appsecret salt.
-defined( 'TI_APP_SECRET' ) or define( 'TI_APP_SECRET', md5(__FILE__) );
+defined( 'TI_APP_SECRET' ) or define( 'TI_APP_SECRET', 'ti-framework' );
 
 // Set the debugging mode to false.
 defined( 'TI_DEBUG_MODE') or define( 'TI_DEBUG_MODE', FALSE );
 
+// Determine if app is running from a console or not.
 define( 'TI_IS_CLI', (php_sapi_name() == 'cli' || empty($_SERVER['REMOTE_ADDR'])) );
 
 // Detect application path.
@@ -146,8 +147,9 @@ if ( !defined('TI_PATH_APP') ) {
 defined( 'TI_PATH_WEB' ) or define( 'TI_PATH_WEB', '/' . trim( dirname( $_SERVER['SCRIPT_NAME'] ), '/' ) );
 
 // Internationalization.
-defined( 'TI_LOCALE' )     or define( 'TI_LOCALE', 'en_US' );
-defined( 'TI_TIMEZONE' )   or define( 'TI_TIMEZONE', 'GMT' );
+defined( 'TI_LOCALE' )              or define( 'TI_LOCALE', 'en_US' );
+defined( 'TI_FOLDER_LOCALE' )       or define( 'TI_FOLDER_LOCALE', 'locale' );
+defined( 'TI_TIMEZONE' )            or define( 'TI_TIMEZONE', 'GMT' );
 
 // Set MVC folders, if they are not set already by the config file.
 defined( 'TI_FOLDER_MODEL' )        or define( 'TI_FOLDER_MODEL', 'class' );
@@ -158,9 +160,6 @@ defined( 'TI_EXT_VIEW' )            or define( 'TI_EXT_VIEW', '.html' );
 defined( 'TI_EXT_CONTROLLER' )      or define( 'TI_EXT_CONTROLLER', '.php' );
 defined( 'TI_AUTORENDER' )          or define( 'TI_AUTORENDER', FALSE );
 defined( 'TI_RULES_CACHE' )         or define( 'TI_RULES_CACHE', FALSE );
-
-// Caches.
-defined( 'TI_FOLDER_LOCALE' )       or define( 'TI_RULES_CACHE', 'locale' );
 defined( 'TI_FOLDER_CACHE' )        or define( 'TI_FOLDER_CACHE', 'cache' );
 
 // Correct the ip.
@@ -241,7 +240,7 @@ if ( !ob_list_handlers() ) {
 }
 
 // Check for __application.php
-if ( is_readable(TI_PATH_APP . '/__application.php') ) {
+if ( is_readable( TI_PATH_APP . '/__application.php' ) ) {
   include TI_PATH_APP . '/__application.php';
 }
 
