@@ -107,58 +107,82 @@
                 <p>&nbsp;</p>
                 <h5>.htaccess</h5>
                 <code class="code">
-    <?php highlight_string('
-    <IfModule mod_rewrite.c>
-        RewriteEngine On
-        SetEnv HTTP_MOD_REWRITE On
-        RewriteRule ^index\.php$ - [L]
-        RewriteCond %{REQUEST_FILENAME} !-f
-        RewriteCond %{REQUEST_FILENAME} !-d
-        RewriteRule (.*) index.php [L]
-    </IfModule>
-')?>
+<?php $htaccess = <<<EOL
+  <IfModule mod_rewrite.c>
+      RewriteEngine On
+      SetEnv HTTP_MOD_REWRITE On
+      RewriteRule ^index\.php$ - [L]
+      RewriteCond %{REQUEST_FILENAME} !-f
+      RewriteCond %{REQUEST_FILENAME} !-d
+      RewriteRule (.*) index.php [L]
+  </IfModule>
+EOL;
+highlight_string($htaccess); unset($htaccess);?>
                 </code>
 
                 <p>&nbsp;</p>
                 <h5>index.php</h5>
                 <code class="code">
 <?php $index = <<< EOL
+
 <?php
 
-// ------------------------------------------------------------- //
-// All these settings are optional, you can set them if you want //
-// ------------------------------------------------------------- //
+  // ------------------------------------------------------------- //
+  // All these settings are optional, you can set them if you want //
+  // ------------------------------------------------------------- //
 
-define('TI_APP_SECRET',        'mun.ee');
+  // Set appsecret salt.
+  define( 'TI_APP_SECRET',           'ti-framework' );
 
-define('TI_DEBUG_MODE',        TRUE);
+  // Set default home url.
+  //define( 'TI_HOME',                 'index' );
 
-//define('TI_PATH_WEB',          '/');
+  // Set the debugging mode to false.
+  //define( 'TI_DEBUG_MODE',           FALSE );
 
-//define('TI_LOCALE',            'en_US');
+  // Detect the webpath.
+  //define( 'TI_PATH_WEB',             '/' );
 
-define('TI_HOME',              'index');
+  // i18n settings.
+  //define( 'TI_LOCALE',               'en_US' );
+  //define( 'TI_FOLDER_LOCALE',        'locale' );
+  //define( 'TI_TIMEZONE',             'GMT' );
 
-//define('TI_TIMEZONE',          'GMT');
+  // Set MVC folders
+  //define( 'TI_FOLDER_MODEL',         'class' );
+  //define( 'TI_FOLDER_VIEW',          'html' );
+  //define( 'TI_FOLDER_CONTROLLER',    'www' );
 
-define('TI_AUTORENDER',    TRUE);
+  // Set MVC file extensions
+  //define( 'TI_EXT_MODEL',            '.php' );
+  //define( 'TI_EXT_VIEW',             '.html' );
+  //define( 'TI_EXT_CONTROLLER',       '.php' );
 
-//define('TI_RULES_CACHE',        0); // FALSE OR Number of seconds for cache
+  // Autorenderer, it call render() method with parameter controller name.
+  //define( 'TI_AUTORENDER',           TRUE );
 
-define('TI_DB',                'mysql:dbname=<database>;host=<host>;username=<username>;password=<password>;prefix=<prefix_>;charset=<charset>');
-//define('TI_DB_CONN2',          'mysql://root@localhost/ti2');
-//define('TI_DB_CONN3',          'interbase://SYS_USER:password@127.0.0.1:c:databases/mydatabase.fbm');
+  // Cache controller rules for faster routing.
+  //define( 'TI_RULES_CACHE',          FALSE );
 
-define('TI_DOCUMENTATION',      TRUE); // call with 'http://example.com/?TI_DOCUMENTATION' parameter
+  // Default directory where ti-framework stores the cache
+  //define( 'TI_FOLDER_CACHE',         'cache' );
 
+  // Setup databases
+  define( 'TI_DB',                'mysql:dbname=test;host=localhost;username=user1;password=passWord;prefix=ti_;charset=UTF8');
+  //define('TI_DB_ti2',           'mysql://root@localhost/ti2');
+  //define('TI_DB_i2',            'interbase://SYS_USER:password@127.0.0.1:c:databases/mydatabase.fbm');
 
-// ------------------------------------------------------------- //
-// This is all required line that you have to have in this file  //
-// Includation instruction to the TI's framework.php             //
-// ------------------------------------------------------------- //
-include 'ti/framework.php';
+  // ti-framework documentation url (http://example.com/<TI_DOCUMENTATION>)
+  define( 'TI_DOCUMENTATION',      'README.html');
+
+  // ------------------------------------------------------------- //
+  // This is all required line that you have to have in this file  //
+  // Includation instruction to the TI's framework.php             //
+  // ------------------------------------------------------------- //
+  include 'ti/framework.php';
+\n
 EOL;
-highlight_string($index)?>
+highlight_string($index);unset($index);?>
                 </code>
 
 

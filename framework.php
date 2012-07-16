@@ -158,7 +158,7 @@ defined( 'TI_FOLDER_CONTROLLER' )   or define( 'TI_FOLDER_CONTROLLER', 'www' );
 defined( 'TI_EXT_MODEL' )           or define( 'TI_EXT_MODEL', '.php' );
 defined( 'TI_EXT_VIEW' )            or define( 'TI_EXT_VIEW', '.html' );
 defined( 'TI_EXT_CONTROLLER' )      or define( 'TI_EXT_CONTROLLER', '.php' );
-defined( 'TI_AUTORENDER' )          or define( 'TI_AUTORENDER', FALSE );
+defined( 'TI_AUTORENDER' )          or define( 'TI_AUTORENDER', TRUE );
 defined( 'TI_RULES_CACHE' )         or define( 'TI_RULES_CACHE', FALSE );
 defined( 'TI_FOLDER_CACHE' )        or define( 'TI_FOLDER_CACHE', 'cache' );
 
