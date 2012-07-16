@@ -110,7 +110,6 @@
 <?php $htaccess = <<<EOL
   <IfModule mod_rewrite.c>
       RewriteEngine On
-      SetEnv HTTP_MOD_REWRITE On
       RewriteRule ^index\.php$ - [L]
       RewriteCond %{REQUEST_FILENAME} !-f
       RewriteCond %{REQUEST_FILENAME} !-d
@@ -125,14 +124,8 @@ highlight_string($htaccess); unset($htaccess);?>
                 <code class="code">
 <?php $index = <<< EOL
 
-<?php
-
-  // ------------------------------------------------------------- //
-  // All these settings are optional, you can set them if you want //
-  // ------------------------------------------------------------- //
-
-  // Set appsecret salt.
-  define( 'TI_APP_SECRET',           'ti-framework' );
+  // Path to application directory.
+  //define( 'TI_PATH_APP',             dirname(__FILE__) . '/application' );
 
   // Set default home url.
   //define( 'TI_HOME',                 'index' );
@@ -140,8 +133,12 @@ highlight_string($htaccess); unset($htaccess);?>
   // Set the debugging mode to false.
   //define( 'TI_DEBUG_MODE',           FALSE );
 
-  // Detect the webpath.
+  // Web url to application (must ending with slash)
+  // can be domain relative like /my-app/ or full http://example.com/ or just /
   //define( 'TI_PATH_WEB',             '/' );
+
+  // Disable mod_rewrite support.
+  //define( 'TI_DISABLE_MOD_REWRITE',  FALSE );
 
   // i18n settings.
   //define( 'TI_LOCALE',               'en_US' );

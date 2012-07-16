@@ -42,63 +42,73 @@ if ( version_compare(PHP_VERSION, '5.2.0', '<') ) {
   die( 'REQUIRE PHP >= 5.2' );
 }
 
-// Fix server vars, all credits to WordPress team.
-$_SERVER = array_merge( array('SERVER_SOFTWARE' => '', 'REQUEST_URI' => ''), $_SERVER );
-
-// Fix for IIS when running with PHP ISAPI
-if ( empty( $_SERVER['REQUEST_URI'] ) ||
-    ( php_sapi_name() != 'cgi-fcgi' && preg_match( '/^Microsoft-IIS\//', $_SERVER['SERVER_SOFTWARE'] ) ) ) {
-
-  // IIS Mod-Rewrite
-  if ( isset( $_SERVER['HTTP_X_ORIGINAL_URL'] ) ) {
-    $_SERVER['REQUEST_URI'] = $_SERVER['HTTP_X_ORIGINAL_URL'];
-  }
-  // IIS Isapi_Rewrite
-  elseif ( isset( $_SERVER['HTTP_X_REWRITE_URL'] ) ) {
-    $_SERVER['REQUEST_URI'] = $_SERVER['HTTP_X_REWRITE_URL'];
-  }
-  else {
-    // Use ORIG_PATH_INFO if there is no PATH_INFO
-    if ( !isset( $_SERVER['PATH_INFO'] ) && isset( $_SERVER['ORIG_PATH_INFO'] ) ) {
-      $_SERVER['PATH_INFO'] = $_SERVER['ORIG_PATH_INFO'];
-    }
-
-    // Some IIS + PHP configurations puts the script-name in the path-info (No need to append it twice)
-    if ( isset( $_SERVER['PATH_INFO'] ) ) {
-      if ( $_SERVER['PATH_INFO'] == $_SERVER['SCRIPT_NAME'] ) {
-        $_SERVER['REQUEST_URI'] = $_SERVER['PATH_INFO'];
-      }
-      else {
-        $_SERVER['REQUEST_URI'] = $_SERVER['SCRIPT_NAME'] . $_SERVER['PATH_INFO'];
-      }
-    }
-
-    // Append the query string if it exists and isn't null
-    if ( ! empty( $_SERVER['QUERY_STRING'] ) ) {
-      $_SERVER['REQUEST_URI'] .= '?' . $_SERVER['QUERY_STRING'];
-    }
-  }
-}
-
-// Fix for PHP as CGI hosts that set SCRIPT_FILENAME to something ending in php.cgi for all requests
-if ( isset( $_SERVER['SCRIPT_FILENAME'] ) && ( strpos( $_SERVER['SCRIPT_FILENAME'], 'php.cgi' )
-    == strlen( $_SERVER['SCRIPT_FILENAME'] ) - 7 ) ) {
-  $_SERVER['SCRIPT_FILENAME'] = $_SERVER['PATH_TRANSLATED'];
-}
-
-// Fix for Dreamhost and other PHP as CGI hosts
-if ( strpos( $_SERVER['SCRIPT_NAME'], 'php.cgi' ) !== FALSE ) {
-  unset( $_SERVER['PATH_INFO'] );
-}
-
-// Fix empty PHP_SELF
-$PHP_SELF = $_SERVER['PHP_SELF'];
-if ( empty( $PHP_SELF ) ) {
-  $_SERVER['PHP_SELF'] = $PHP_SELF = preg_replace( '/(\?.*)?$/', '', $_SERVER["REQUEST_URI"] );
-}
-
 // Set path framework.
 define( 'TI_PATH_FRAMEWORK', dirname(__FILE__) );
+
+defined( 'TI_DISABLE_MOD_REWRITE' ) or define( 'TI_DISABLE_MOD_REWRITE',  FALSE );
+
+// Correct the requested URL
+if ( TI_DISABLE_MOD_REWRITE ) {
+  if ( empty($_SERVER['REQUEST_URI']) ) {
+    $_SERVER['REQUEST_URI'] = '/';
+  }
+}
+else {
+  // Fix server vars, all credits to WordPress team.
+  $_SERVER = array_merge( array('SERVER_SOFTWARE' => '', 'REQUEST_URI' => ''), $_SERVER );
+
+  // Fix for IIS when running with PHP ISAPI
+  if ( empty( $_SERVER['REQUEST_URI'] ) ||
+      ( php_sapi_name() != 'cgi-fcgi' && preg_match( '/^Microsoft-IIS\//', $_SERVER['SERVER_SOFTWARE'] ) ) ) {
+
+    // IIS Mod-Rewrite
+    if ( isset( $_SERVER['HTTP_X_ORIGINAL_URL'] ) ) {
+      $_SERVER['REQUEST_URI'] = $_SERVER['HTTP_X_ORIGINAL_URL'];
+    }
+    // IIS Isapi_Rewrite
+    elseif ( isset( $_SERVER['HTTP_X_REWRITE_URL'] ) ) {
+      $_SERVER['REQUEST_URI'] = $_SERVER['HTTP_X_REWRITE_URL'];
+    }
+    else {
+      // Use ORIG_PATH_INFO if there is no PATH_INFO
+      if ( !isset( $_SERVER['PATH_INFO'] ) && isset( $_SERVER['ORIG_PATH_INFO'] ) ) {
+        $_SERVER['PATH_INFO'] = $_SERVER['ORIG_PATH_INFO'];
+      }
+
+      // Some IIS + PHP configurations puts the script-name in the path-info (No need to append it twice)
+      if ( isset( $_SERVER['PATH_INFO'] ) ) {
+        if ( $_SERVER['PATH_INFO'] == $_SERVER['SCRIPT_NAME'] ) {
+          $_SERVER['REQUEST_URI'] = $_SERVER['PATH_INFO'];
+        }
+        else {
+          $_SERVER['REQUEST_URI'] = $_SERVER['SCRIPT_NAME'] . $_SERVER['PATH_INFO'];
+        }
+      }
+
+      // Append the query string if it exists and isn't null
+      if ( ! empty( $_SERVER['QUERY_STRING'] ) ) {
+        $_SERVER['REQUEST_URI'] .= '?' . $_SERVER['QUERY_STRING'];
+      }
+    }
+  }
+
+  // Fix for PHP as CGI hosts that set SCRIPT_FILENAME to something ending in php.cgi for all requests
+  if ( isset( $_SERVER['SCRIPT_FILENAME'] ) && ( strpos( $_SERVER['SCRIPT_FILENAME'], 'php.cgi' )
+      == strlen( $_SERVER['SCRIPT_FILENAME'] ) - 7 ) ) {
+    $_SERVER['SCRIPT_FILENAME'] = $_SERVER['PATH_TRANSLATED'];
+  }
+
+  // Fix for Dreamhost and other PHP as CGI hosts
+  if ( strpos( $_SERVER['SCRIPT_NAME'], 'php.cgi' ) !== FALSE ) {
+    unset( $_SERVER['PATH_INFO'] );
+  }
+
+  // Fix empty PHP_SELF
+  $PHP_SELF = $_SERVER['PHP_SELF'];
+  if ( empty( $PHP_SELF ) ) {
+    $_SERVER['PHP_SELF'] = $PHP_SELF = preg_replace( '/(\?.*)?$/', '', $_SERVER["REQUEST_URI"] );
+  }
+}
 
 // Set default home url.
 defined( 'TI_HOME' ) or define( 'TI_HOME', 'index' );
@@ -125,7 +135,7 @@ defined( 'TI_APP_SECRET' ) or define( 'TI_APP_SECRET', 'ti-framework' );
 defined( 'TI_DEBUG_MODE') or define( 'TI_DEBUG_MODE', FALSE );
 
 // Determine if app is running from a console or not.
-define( 'TI_IS_CLI', (php_sapi_name() == 'cli' || empty($_SERVER['REMOTE_ADDR'])) );
+define( 'TI_IS_CLI', ( php_sapi_name() == 'cli' || empty($_SERVER['REMOTE_ADDR']) ) );
 
 // Detect application path.
 if ( !defined('TI_PATH_APP') ) {
@@ -135,16 +145,16 @@ if ( !defined('TI_PATH_APP') ) {
     unset( $i );
   }
   else {
-    define('TI_PATH_APP', dirname( $_SERVER['SCRIPT_FILENAME'] )  . '/application/' );
+    define( 'TI_PATH_APP', dirname( $_SERVER['SCRIPT_FILENAME'] )  . '/application/' );
   }
 
-  if (!TI_PATH_APP) {
+  if ( !TI_PATH_APP ) {
     die( 'Application path not defined.' );
   }
 }
 
 // Detect the webpath.
-defined( 'TI_PATH_WEB' ) or define( 'TI_PATH_WEB', '/' . trim( dirname( $_SERVER['SCRIPT_NAME'] ), '/' ) );
+defined( 'TI_PATH_WEB' ) or define( 'TI_PATH_WEB', pathinfo( $_SERVER['SCRIPT_NAME'], PATHINFO_DIRNAME ) );
 
 // Internationalization.
 defined( 'TI_LOCALE' )              or define( 'TI_LOCALE', 'en_US' );

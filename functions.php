@@ -244,7 +244,7 @@ function is_mobile() {
  * @return bool
  */
 function match_url($pattern = '') {
-  $pattern = '/' . strtr(preg_quote(trim($pattern, '/')), array('%s' => '([^\/]+)', '%d' => '([0-9]+)')) . '\/(.+)?';
+  $pattern = '/' . strtr( preg_quote( trim( $pattern, '/' ) ), array( '%s' => '([^\/]+)', '%d' => '([0-9]+)' ) ) . '\/(.+)?';
   $matched = preg_match( '#^' . $pattern . '$#', $_SERVER['REQUEST_URI'] ) ? TRUE : FALSE;
   $matched = do_hook( __FUNCTION__, $matched, $pattern, $_SERVER['REQUEST_URI'] );
   return $matched;
@@ -262,15 +262,16 @@ function match_url($pattern = '') {
  */
 function site_url($url = '') {
 
-  if (func_num_args() > 1) {
+  if ( func_num_args() > 1 ) {
     $url = func_get_args();
   }
 
-  if (is_array($url)) {
-    $url = implode('/', $url);
+  if ( is_array($url) ) {
+    $url = implode( '/', $url );
   }
 
-  $url = preg_replace( '/\/{2,}/', '/', TI_PATH_WEB . trim( $url, '/' ) . '/' );
+  $url = TI_PATH_WEB . ( TI_DISABLE_MOD_REWRITE ? '?' : '' ) .
+         preg_replace( '#\/{2,}#', '/', trim( $url, '/' ) . '/' );
 
   return do_hook( __FUNCTION__, $url );
 }
@@ -293,54 +294,6 @@ function current_url() {
  */
 function base_url() {
   return TI_PATH_WEB;
-}
-
-/**
- * Same like parse_url() function, but work and with not completed uris
- * however, it's better using parse_uri() instands of parse_url()
- *
- * @param string $uri
- *
- * @return array
- *   with parts of the url (scheme, host, port, user, ...)
- */
-function parse_uri($uri = '') {
-
-  $uri = explode('://', $uri, 2);
-
-  $tmp = explode('/', array_pop($uri), 2);
-
-  $query['scheme'] = array_shift($uri);
-
-  $host = array_shift($tmp);
-  $path = array_pop($tmp);
-
-  $tmp = explode('@', $host, 2);
-
-  $hp = explode(':', array_pop($tmp));
-  $query['host'] = array_shift($hp);
-  $query['port'] = array_shift($hp);
-
-  $tmp = explode(':', array_shift($tmp), 2);
-  $query['username'] = array_shift($tmp);
-  $query['password'] = array_shift($tmp);
-
-  $segment = explode('#', $path, 2);
-
-  $path = array_shift($segment);
-  $query['segment'] = array_pop($segment);
-
-  $path = explode('?', $path, 2);
-  $query['path'] = array_shift($path);
-
-  parse_str(array_shift($path), $query['query']);
-
-  foreach ($query['query'] as $key => $val) {
-    unset($query['query'][$key]);
-    $query['query'][strtoupper($key)] = $val;
-  }
-
-  return $query;
 }
 
 /**
@@ -372,7 +325,7 @@ function redirect($url = NULL, $time_to_wait = 0) {
     header( 'Refresh: ' . $time_to_wait . '; url=' . $url );
   }
   else {
-    header('Location: ' . $url );
+    header( 'Location: ' . $url );
   }
   exit;
 }
@@ -464,7 +417,7 @@ function load_locale($Locale = '') {
     return FALSE;
   }
 
-  $_LOCALE = CAST_TO_ARRAY( $_lang );
+  $_LOCALE = array_merge( $_LOCALE, CAST_TO_ARRAY( $_lang ) );
   return TRUE;
 }
 
@@ -676,7 +629,7 @@ function show_404($message = '') {
     header('HTTP/1.1 404 Not Found');
   }
 
-  show_error('404 Page Not Found', '<p>The page you requested was not found.</p><p>&nbsp;</p><div>' . $message . '</div>', 404);
+  show_error('404 Page Not Found', '<p>The page you requested &quot;' . current_url() . '&quot; was not found.</p><p>&nbsp;</p><div>' . $message . '</div>', 404);
 }
 
 /**
