@@ -155,7 +155,7 @@ highlight_string($htaccess); unset($htaccess);?>
   //define( 'TI_EXT_VIEW',             '.html' );
   //define( 'TI_EXT_CONTROLLER',       '.php' );
 
-  // Autorenderer, it call render() method with parameter controller name.
+  // Autorenderer, it call \$this->render() method with parameter controller name.
   //define( 'TI_AUTORENDER',           TRUE );
 
   // Cache controller rules for faster routing.

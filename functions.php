@@ -1165,12 +1165,12 @@ function copydir($source, $destination, $directory_permission = 0755, $file_perm
 }
 
 /**
- * Find file in directory try by a pattern.
+ * Find files in directory by a pattern.
  *
  * @param string $directory
  * @param string $pattern
  *
- * @return boolean|string
+ * @return array
  */
 function find_file($directory = '.', $pattern = '', $skip_hidden = TRUE) {
 
@@ -1413,7 +1413,7 @@ function http_query($url, $type = 'GET', $data = NULL, &$header = '', $timeout =
  *
  * @param string $filename
  *
- * @return boolean
+ * @return bool
  */
 function is_writable_real( $filename = '') {
 
@@ -1592,7 +1592,7 @@ function cookie_get($name, $fallback = NULL) {
  * @param string|array $key
  * @param mixed $value
  *
- * @return boolean
+ * @return bool
  */
 function session_set($key = '', $value = '') {
 
@@ -1644,7 +1644,7 @@ function create_nonce($id = 'global') {
  * @param string $id
  * @param string $nonce_key
  *
- * @return boolean
+ * @return bool
  */
 function check_nonce($id = 'global', $nonce_key = '') {
   return ( strcmp( CAST_TO_STRING($nonce_key), session_get('_ti_nonce_' . make_hash( $id )) === 0));
@@ -1657,7 +1657,7 @@ function check_nonce($id = 'global', $nonce_key = '') {
  * @param string|callback $function_name
  * @param int $priority
  *
- * @return boolean
+ * @return bool
  */
 function add_hook($hook_name, $function, $priority = 10) {
 
@@ -1687,23 +1687,23 @@ function add_hook($hook_name, $function, $priority = 10) {
  * @param mixed $value
  * @param mixed $arg1
  * @param mixed $arg2
- * @param ...
+ * @param mixed ...
  * @param mixed $argN
  *
  * @return mixed
  */
 function do_hook($hook_name, $value = NULL) {
 
-  if ( !has_hook($hook_name) ) {
+  if ( !has_hook( $hook_name ) ) {
     return $value;
   }
 
   global $_HOOKS;
 
-  ksort($_HOOKS[$hook_name]);
+  ksort( $_HOOKS[$hook_name] );
 
   $args = func_get_args();
-  unset($args[0]);
+  unset( $args[0] );
 
   foreach ( $_HOOKS[$hook_name] as $hook_priority ) {
     foreach ( $hook_priority as $hook ) {
@@ -1721,7 +1721,7 @@ function do_hook($hook_name, $value = NULL) {
  *
  * @param string $hook_name
  *
- * @return boolean
+ * @return bool
  */
 function delete_hook($hook_name) {
 
@@ -1746,7 +1746,7 @@ function delete_hook($hook_name) {
  */
 function has_hook($hook_name) {
   global $_HOOKS;
-  return empty($_HOOKS[$hook_name]) ? FALSE : count($_HOOKS[$hook_name]);
+  return empty( $_HOOKS[$hook_name] ) ? FALSE : count( $_HOOKS[$hook_name] );
 }
 
 /**
@@ -1763,11 +1763,11 @@ function cache_put($key = '', $data = NULL) {
 
   $directory = TI_PATH_APP . '/' . TI_FOLDER_CACHE . '/';
 
-  if (!is_dir($directory) && !mkdir($directory, 0700, TRUE)) {
+  if ( !is_dir($directory) && !mkdir( $directory, 0700, TRUE )) {
     return FALSE;
   }
 
-  return file_put_contents($directory . $file, CAST_TO_STRING($data)) ? TRUE : FALSE;
+  return file_put_contents( $directory . $file, CAST_TO_STRING( $data ) ) ? TRUE : FALSE;
 }
 
 /**
@@ -1776,14 +1776,14 @@ function cache_put($key = '', $data = NULL) {
  * @param string $key
  * @param unknown_type $expire
  *
- * @return boolean
+ * @return bool
  */
 function cache_get($key = '', $expire = '3600') {
   $cache_exists = cache_exists( $key, $expire );
   if ($cache_exists === FALSE) {
     return FALSE;
   }
-  return file_get_contents($cache_exists);
+  return file_get_contents( $cache_exists );
 }
 
 /**
@@ -1792,7 +1792,7 @@ function cache_get($key = '', $expire = '3600') {
  * @param string $key
  * @param int $expire
  *
- * @return string|boolean
+ * @return string|bool
  *   file to the cache file.
  */
 function cache_exists($key = '', $expire = '3600') {
@@ -1819,7 +1819,7 @@ function cache_delete($key = '') {
 
   $file = TI_PATH_APP . '/' . TI_FOLDER_CACHE . '/' . md5(dirname($id)) . '-' . md5($id);
 
-  if (file_exists($file)) {
+  if ( file_exists($file) ) {
     return unlink($file);
   }
 
@@ -1834,7 +1834,7 @@ function cache_delete($key = '') {
  * @return string
  */
 function esc_attr($string = '') {
-  return htmlspecialchars(CAST_TO_STRING($string), ENT_QUOTES);
+  return htmlspecialchars( CAST_TO_STRING($string), ENT_QUOTES );
 }
 
 /**
@@ -1848,8 +1848,8 @@ function esc_attr($string = '') {
  *   or echo if $return is set to FALSE
  */
 function selected($current = '', $default = 1, $return = TRUE) {
-  if (CAST_TO_STRING($current) === CAST_TO_STRING($default)) {
-    if ($return) {
+  if ( CAST_TO_STRING($current) === CAST_TO_STRING($default) ) {
+    if ( $return ) {
       return ' selected="selected"';
     }
     else {
@@ -2289,6 +2289,8 @@ function byte_format($num = 0, $precision = 2) {
 /**
  * Make path like string more readable.
  *
+ * path_to_human('category/test-products') // Category Test Products
+ *
  * @param string $string
  *
  * @return string
@@ -2303,6 +2305,9 @@ function path_to_human($string = '') {
 
 /**
  * Make text look like a path.
+ *
+ * human_to_path('Category/Test Products') // category/test-products
+ * human_to_path('33 Example MS Word document.docx') // 33-example-ms-word-document.docx
  *
  * @param string $string
  *
@@ -2319,6 +2324,8 @@ function human_to_path($string = '') {
 
 /**
  * Convert path a like string to assoc array.
+ *
+ * path_to_assoc('category/example/tag/test') // array( 'category' => 'example', 'tag' => 'test' )
  *
  * @param string $path
  * @param int $offset
@@ -2342,6 +2349,8 @@ function path_to_assoc($path = '', $offset = 0) {
 
 /**
  * Convert assoc array to path.
+ *
+ * assoc_to_path(array( 'category' => 'example', 'tag' => 'test' )) // category/example/tag/test
  *
  * @param array $array.
  *
@@ -2433,6 +2442,8 @@ function substr_middle($string = '', $length = 255, $separate = '&#8230;') {
 /**
  * Strip duplicated chars.
  *
+ * strip_duplicated_chars('Helllo MyyFriend __1') // Helo MyFriend _1
+ *
  * @param string $string
  *
  * @return string
@@ -2443,6 +2454,8 @@ function strip_duplicated_chars($string = '') {
 
 /**
  * Upper word by a char.
+ *
+ * ucwords_by_char('hello-world', '-') // Hello World
  *
  * @param string $string
  * @param string $char
