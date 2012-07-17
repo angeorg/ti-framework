@@ -39,13 +39,14 @@ if ( defined('TI_PATH_FRAMEWORK') ):
 
 /**
  * Load URL when define new object of Application with parameters.
-* @see Application->load().
-*
-* @param string $url
-* @param string $return
-*
-* @return Application
-*/
+ *
+ * @see Application->load().
+ *
+ * @param string $url
+ * @param string $return
+ *
+ * @return Application
+ */
 function Application($url = '', $return = FALSE) {
   $app = new Application( $url, $reutrn );
   return $app;
@@ -746,8 +747,48 @@ function string_sanitize($string = '') {
       "\xef\xbf\xb9", "\xef\xbf\xba", "\xef\xbf\xbb", "\xE2\x80\x8D"), '', $string);
 }
 
+if ( function_exists( 'is_utf8' ) ):
+/**
+ * Checks whether a string is valid UTF-8.
+ *
+ * All credits to Drupal's team
+ *
+ * All functions designed to filter input should use drupal_validate_utf8
+ * to ensure they operate on valid UTF-8 strings to prevent bypass of the
+ * filter.
+ *
+ * When text containing an invalid UTF-8 lead byte (0xC0 - 0xFF) is presented
+ * as UTF-8 to Internet Explorer 6, the program may misinterpret subsequent
+ * bytes. When these subsequent bytes are HTML control characters such as
+ * quotes or angle brackets, parts of the text that were deemed safe by filters
+ * end up in locations that are potentially unsafe; An onerror attribute that
+ * is outside of a tag, and thus deemed safe by a filter, can be interpreted
+ * by the browser as if it were inside the tag.
+ *
+ * The function does not return FALSE for strings containing character codes
+ * above U+10FFFF, even though these are prohibited by RFC 3629.
+ *
+ * @param $text
+ *   The text to check.
+ *
+ * @return bool
+ *   TRUE if the text is valid UTF-8, FALSE if not.
+ */
+function is_utf8($text) {
+  if ( strlen($text) == 0 ) {
+    return TRUE;
+  }
+  // With the PCRE_UTF8 modifier 'u', preg_match() fails silently on strings
+  // containing invalid UTF-8 byte sequences. It does not reject character
+  // codes above U+10FFFF (represented by 4 or more octets), though.
+  return (preg_match('/^./us', $text) == 1);
+}
+endif;
+
 /**
  * Cast given value to integer
+ * This function can cast any-type variables,
+ * and safe return integer value (objects, arrays, resources,..)
  *
  * @param mixed $var
  * @param int $min
@@ -773,6 +814,8 @@ function CAST_TO_INT($var = 0, $min = NULL, $max = NULL) {
 
 /**
  * Cast given value to float
+ * This function can cast any-type variables,
+ * and safe return float value (objects, arrays, resources,..)
  *
  * @param mixed $var
  * @param int $min
@@ -780,18 +823,18 @@ function CAST_TO_INT($var = 0, $min = NULL, $max = NULL) {
  * @param int $max
  *   maximal value (optional)
  *
- * @return float
+ * @return double
  */
 function CAST_TO_FLOAT($var = 0, $min = NULL, $max = NULL) {
   if (is_array($var) && count($var) === 1) {
     $var = array_shift($var);
   }
-  $var = is_float($var) ? $var : (is_scalar($var) ? (float) $var : 0);
+  $var = is_float($var) ? $var : (is_scalar($var) ? (double) $var : 0);
   if ($min !== NULL && $var < $min) {
-    return $min;
+    return (double) $min;
   }
   elseif ($max !== NULL && $var > $max) {
-    return $max;
+    return (double) $max;
   }
   return $var;
 }
@@ -805,7 +848,6 @@ function CAST_TO_FLOAT($var = 0, $min = NULL, $max = NULL) {
  * @param mixed $var
  *
  * @return bool
-
  */
 function CAST_TO_BOOL($var = FALSE) {
 
@@ -814,6 +856,9 @@ function CAST_TO_BOOL($var = FALSE) {
 
 /**
  * Cast given value to string
+ * This function can cast any-type variables,
+ * and safe return string value (objects, arrays, resources,..)
+ * also if it is array or object it concatinate their items (properties)
  *
  * @param mixed $var
  * @param int $length
@@ -838,43 +883,18 @@ function CAST_TO_STRING($var = '', $length = FALSE, $implode_arrays = ' ') {
 }
 
 /**
- * Cast given value to mysql datetime
- *
- * @param mixed $var
- *
- * @return string
- *   datetime 'YYYY-MM-DD HH:MM:SS'
- */
-function CAST_TO_DATETIME($var = '0000-00-00 00:00:00') {
-  return date( 'Y-m-d H:i:s', strtotime(CAST_TO_STRING($var) ));
-}
-
-/**
- * Cast given value to date
- *
- * @param mixed value
- *
- * @return string
- *   date YYYY-MM-DD
- */
-function CAST_TO_DATE($var = '0000-00-00') {
-  return date( 'Y-m-d', strtotime(CAST_TO_STRING($var)) );
-}
-
-/**
- * Cast given value to time
- *
- * @param mixed value
- *
- * @return string
- *   time 'HH:MM:SS'
- */
-function CAST_TO_TIME($var = '00:00:00') {
-  return date( 'H:i:s', strtotime(CAST_TO_STRING($var)) );
-}
-
-/**
  * Cast given value to array
+ * This function can cast any-type variables,
+ * and safe return array value (objects, arrays, resources,..)
+ *
+ * CAST_TO_ARRAY('t1=test&t2=test2&hello=world')
+ * // array(
+ * //    't1' => 'test',
+ * //    't2' => 'test2',
+ * //    'hello' => 'world',
+ * // );
+ *
+ * CAST_TO_ARRAY('hello world') // array('hello world')
  *
  * @param mixed value
  *
@@ -901,6 +921,17 @@ function CAST_TO_ARRAY( $var = array() ) {
 
 /**
  * Cast given value to object
+ * This function can cast any-type variables,
+ * and safe return array value (objects, arrays, resources,..)
+ *
+ * CAST_TO_OBJECT('t1=test&t2=test2&hello=world')
+ * // stdClass {
+ * //     $t1 = 'test';
+ * //     $t2 = 'test2';
+ * //     $hello = 'world';
+ * // }
+ *
+ * CAST_TO_OBJECT('hello world') // array('hello world')
  *
  * @param mixed value
  *
@@ -1165,12 +1196,15 @@ function copydir($source, $destination, $directory_permission = 0755, $file_perm
 }
 
 /**
- * Find files in directory by a pattern.
+ * Perform a regex (perl) search for files in directory.
  *
  * @param string $directory
+ *   directory root to search in (subfolders are included)
  * @param string $pattern
+ *   regex pattern
  *
  * @return array
+ *   list with matched files
  */
 function find_file($directory = '.', $pattern = '', $skip_hidden = TRUE) {
 
@@ -1298,10 +1332,12 @@ function send_mail($to = '', $subject = '(No subject)', $message = '', $header =
     $header = CAST_TO_ARRAY($header);
   }
 
-  ifsetor($header['MIME-Version'], '1.0');
-  ifsetor($header['Content-type'], 'text/html; charset=UTF-8; format=flowed');
-  ifsetor($header['Content-Transfer-Encoding'], '8bit');
-  ifsetor($header['X-Mailer'], 'PHP-' . phpversion());
+  $header = array_merge(array(
+      'MIME-Version' => '1.0',
+      'Content-type' => 'text/html; charset=UTF-8; format=flowed; delsp=yes',
+      'Content-Transfer-Encoding' => '8bit',
+      'X-Mailer' => 'PHP-' . phpversion(),
+  ), $header );
 
   $headers = do_hook( 'send_mail_headers', $headers );
 
@@ -1331,6 +1367,7 @@ function send_mail($to = '', $subject = '(No subject)', $message = '', $header =
  * @param string $timeout
  *
  * @return bool|string
+ *   FALSE if error ocure, or string if all is okay and content is obtained.
  */
 function http_query($url, $type = 'GET', $data = NULL, &$header = '', $timeout = 30) {
 
@@ -1554,6 +1591,7 @@ if ( !function_exists('parse_ini_string') ) {
 
 /**
  * Quick way to set cookie.
+ * Better to use cookie_set() instead of php's cookie functions.
  *
  * @param string $name
  * @param mixed $value
@@ -1566,7 +1604,6 @@ if ( !function_exists('parse_ini_string') ) {
  * @return bool
  */
 function cookie_set($name, $value = '', $expire = 0, $path = '', $domain = '', $secure = FALSE, $httponly = FALSE) {
-  $name = md5($name);
   $value = CAST_TO_STRING($value);
 
   $_COOKIE[$name] = $value;
@@ -1582,7 +1619,6 @@ function cookie_set($name, $value = '', $expire = 0, $path = '', $domain = '', $
  * @return mixed
  */
 function cookie_get($name, $fallback = NULL) {
-  $name = md5($name);
   return isset($_COOKIE[$name]) ? $_COOKIE[$name] : $fallback;
 }
 
@@ -1630,8 +1666,9 @@ function session_get($key = '', $fallback = NULL) {
 }
 
 /**
- * Create nonce
- * @param unknown_type $id
+ * Create nonce, for safe private urls or keys
+ *
+ * @param string $id
  */
 function create_nonce($id = 'global') {
   $n = make_hash( microtime() );
@@ -1641,6 +1678,7 @@ function create_nonce($id = 'global') {
 
 /**
  * Check nonce.
+ *
  * @param string $id
  * @param string $nonce_key
  *
@@ -1652,6 +1690,19 @@ function check_nonce($id = 'global', $nonce_key = '') {
 
 /**
  * Add hook callback.
+ *
+ * add_hook('test', 'hook_hello_world');
+ * function hook_hello_world($content, $action = '') {
+ *   if ($action === 'test1') {
+ *     return $content . '!';
+ *   }
+ *   return $content;
+ * }
+ *
+ * // PHP 5.3
+ * add_hook( 'test', function($content) {
+ *   return $content . ' :)';
+ * });
  *
  * @param string $hook_name
  * @param string|callback $function_name
@@ -1681,7 +1732,26 @@ function add_hook($hook_name, $function, $priority = 10) {
 }
 
 /**
- * Fire a function.
+ * Fire a hook.
+ *
+ * $a = 'Hello World';
+ *
+ * add_hook('test', 'hook_hello_world');
+ * function hook_hello_world($content, $action = '') {
+ *   if ($action === 'test1') {
+ *     return $content . '!';
+ *   }
+ *   return $content;
+ * }
+ *
+ * // PHP 5.3
+ * add_hook( 'test', function($content) {
+ *   return $content . ' :)';
+ * });
+ *
+ * echo do_hook( 'test', $a, 'test1'); // Hello World! :)
+ * echo do_hook( 'test', $a, 'nope');  // Hello World :)
+ *
  *
  * @param string $hook_name
  * @param mixed $value
@@ -1940,6 +2010,7 @@ function strip_attributes($html = '') {
 
 /**
  * Evalute php
+ *
  * @param string $string
  * @param array $local_variables
  * @param bool $return
@@ -2208,6 +2279,10 @@ function human_time_diff( $from, $to = '' ) {
 
 /**
  * Simple alternator implementation.
+ *
+ * echo alternator('one', 'two', 'tree') // one
+ * echo alternator('one', 'two', 'tree') // two
+ * echo alternator('one', 'two', 'tree') // tree
  *
  * @param mixed $arg1
  * @param mixed $arg2
@@ -2480,6 +2555,9 @@ function strip_whitespaces($text = '') {
 /**
  * Decimal to roman
  *
+ * echo dec_to_roman(8); // VIII
+ * echo dec_to_roman(21); // XXI
+ *
  * @param int $decimal
  *
  * @return string
@@ -2520,6 +2598,8 @@ function num_to_month($num = 0, $long_names = FALSE) {
 
 /**
  * TI-framework transliteration implementation.
+ *
+ * echo transliterate('Здравей Свят!'); // Zdravei Svyat!
  *
  * @fire transliterate
  *
