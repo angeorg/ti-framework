@@ -102,6 +102,7 @@ class Application {
 
   /**
    * Load URL when define new object of Application with parameters.
+   *
    * @see load() method.
    *
    * @param string $url
@@ -118,6 +119,7 @@ class Application {
 
   /**
    * Load URL and process it.
+   *
    * @fire application_routes
    *
    * @param string $url

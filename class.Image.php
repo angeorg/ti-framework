@@ -425,7 +425,13 @@ class Image {
   /**
    * Add wattermark to the image.
    *
-   * @param
+   * @param string $image
+   *   path to image that will be used for wattermark
+   * @param int $size
+   * @param string $position
+   *   TOP BOTTOM LEFT RIGHT
+   *
+   * @return bool
    */
   function wattermark_image($image, $size = 0, $position = 'RIGHT BOTTOM') {
 

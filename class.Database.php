@@ -299,51 +299,57 @@ function sql_now($timestamp = 0) {
 /**
  * Get html5 suitable input type from sql column type
  *
+ * @fire sql_type_to_widget
+ *
  * @param string $type
  *
  * @return string
  */
-function sql_type_to_widget( $columntype = '' ) {
+function sql_type_to_widget( $type = '' ) {
 
   $type = CAST_TO_STRING( $type );
 
   if ( preg_match('/^(tinyint\(1\)|bool|boolean)/i', $type) ) {
-    return 'BOOLEAN';
+    $widget = 'BOOLEAN';
   }
 
-  if ( preg_match('/^(tinyint|mediumint|int|smallint|bigint|numeric|real|double|float)/i', $type)) {
-    return 'NUMBER';
+  elseif ( preg_match('/^(tinyint|mediumint|int|smallint|bigint|numeric|real|double|float)/i', $type)) {
+    $widget = 'NUMBER';
   }
 
-  if ( preg_match('/^(tinytext|text|mediumtext|longtext)/i', $type) ) {
-    return 'TEXTAREA';
+  elseif ( preg_match('/^(tinytext|text|mediumtext|longtext)/i', $type) ) {
+    $widget = 'TEXTAREA';
   }
 
-  if ( preg_match('/^(tinyblob|blob|mediumblob|longblob)/i', $type) ) {
-    return 'FILE';
+  elseif ( preg_match('/^(tinyblob|blob|mediumblob|longblob)/i', $type) ) {
+    $widget = 'FILE';
   }
 
-  if ( preg_match('/^(timestamp|datetime)/i', $type) ) {
-    return 'DATETIME';
+  elseif ( preg_match('/^(timestamp|datetime)/i', $type) ) {
+    $widget = 'DATETIME';
   }
 
-  if ( preg_match('/^date/i', $type) ) {
-    return 'DATE';
+  elseif ( preg_match('/^date/i', $type) ) {
+    $widget = 'DATE';
   }
 
-  if ( preg_match('/^time/i', $type) ) {
-    return 'TIME';
+  elseif ( preg_match('/^time/i', $type) ) {
+    $widget = 'TIME';
   }
 
-  if ( preg_match('/^set\(.*\)/i', $type) ) {
-    return 'CHECKBOX';
+  elseif ( preg_match('/^set\(.*\)/i', $type) ) {
+    $widget = 'CHECKBOX';
   }
 
-  if ( preg_match('/^enum\(.*\)/i', $type) ) {
-    return 'SELECT';
+  elseif ( preg_match('/^enum\(.*\)/i', $type) ) {
+    $widget = 'SELECT';
   }
 
-  return 'TEXT';
+  else {
+    $widget = 'TEXT';
+  }
+
+  return do_hook( 'sql_type_to_widget', $widget, $type );
 }
 
 /**

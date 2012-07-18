@@ -396,7 +396,11 @@ function redirect_301($url = NULL) {
  *   filepath to the po
  *
  * @return array
- *   array(msgid => msgstr,...)
+ *   array(
+ *     msgid => msgstr,
+ *     msgid1 => msgstr2
+ *     ...
+ *   )
  */
 function po_to_array($file = '') {
 
@@ -506,6 +510,7 @@ function load_locale($Locale = '') {
  *     return $string;
  *
  *   });
+ * ?>
  *
  * @fire __
  *
@@ -1176,17 +1181,17 @@ function array_group_by($array = array(), $key = 0) {
  */
 function array_get_by_path($path = '/', $array = array()) {
 
-  $path = trim(preg_replace('/\/{2,}/', '/', $path), '/ ');
+  $path = trim( preg_replace( '/\/{2,}/', '/', $path ), '/ ' );
 
   if (!$path) {
     return $array;
   }
 
-  $path = explode('/', $path);
+  $path = explode( '/', $path );
 
   $current_pointer = & $array;
-  foreach ($path as $segment) {
-    if (isset($current_pointer[$segment])) {
+  foreach ( $path as $segment ) {
+    if ( isset( $current_pointer[$segment] ) ) {
       $current_pointer = & $current_pointer[$segment];
     }
     else {
@@ -2348,7 +2353,7 @@ function is_ip($string = '', $ipv6 = FALSE) {
 }
 
 /**
- * Convert minutes to hours
+ * Convert minutes to hours (HH:MM)
  *
  * @param int $mins
  * @param string $format
@@ -2360,7 +2365,7 @@ function min_to_hour($mins = 0, $format = '%02d:%02d') {
 }
 
 /**
- * Convert seconds to hours
+ * Convert seconds to hours (HH:MM:SS)
  *
  * @param int $seconds
  * @param string $format

@@ -40,27 +40,27 @@ class Pagination {
    * Current page
    */
   public $current_page = 1;
-  
+
   /**
    * Total num of records to paginate
    */
   public $total_rows = 100;
-  
+
   /**
    * How many per page to show
    */
   public $per_page = 20;
-  
+
   /**
    * Base url, printf format
    */
   public $base_url = '';
-  
+
   /**
    * How many cells to show
    */
   public $size = 10;
-  
+
   /**
    * Format of normal cell (printf format)
    */
@@ -96,6 +96,9 @@ class Pagination {
    * @return Pagination
    */
   function __construct($config = array()) {
+
+    $config = do_hook( 'pagination_config', $config );
+
     if ( $config ) {
       foreach ( CAST_TO_ARRAY( $config ) as $key => $val ) {
         if ( isset($this->{$key}) ) {
@@ -112,7 +115,7 @@ class Pagination {
    * @return Pagination
    */
   public function generate() {
-  
+
     if ( $this->per_page >= $this->total_rows ) {
       return FALSE;
     }
@@ -192,7 +195,7 @@ class Pagination {
     }
 
     $this->html = $html;
-    
+
     return $this;
   }
 
