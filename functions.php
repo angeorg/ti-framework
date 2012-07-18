@@ -78,6 +78,25 @@ function mbus($text = '') {
 /**
  * PDO accesspoint.
  *
+ * <?php
+ *   // Example calling.
+ *   db()->query(...);
+ *
+ *   // Example calling nondefault (defined with TI_DB_fb)
+ *   db('fb')->query(...);
+ *
+ *   // Modify the driver params when init the PDO
+ *   add_hook('pdo_options', function($options, $data, $driver) {
+ *
+ *     if ($driver == 'mysql') {
+ *       $options[PDO::MYSQL_ATTR_INIT_COMMAND] = 'SET NAMES cp1251';
+ *     }
+ *
+ *     return $options;
+ *
+ *   });
+ * ?>
+ *
  * @fire pdo_options
  *
  * @param string TI_DB_<ID>
@@ -206,6 +225,13 @@ function ti_autoloader($Library = '') {
 /**
  * Is access from mobile device?
  *
+ * <?php
+ *   // Using the hook to force result.
+ *   add_hook('is_mobile', function() {
+ *     return TRUE;
+ *   });
+ * ?>
+ *
  * @fire is_mobile
  *
  * @return bool
@@ -253,6 +279,12 @@ function match_url($pattern = '') {
 
 /**
  * Generate url for application's path
+ *
+ * <?php
+ *   // Replace the domain
+ *   add_hook('site_url', function($url) {
+ *     return str_replace($url, 'http://example.com', 'http://example2.com');
+ *   });
  *
  * @fire site_url
  *
@@ -551,12 +583,13 @@ function set_document_downloadable($filename = '', $size = 0) {
 /**
  * Simple HTTP document authorisation
  *
- * Callback takes two parameters:
- *   1st - $username
- *   2nd - $password
- *   Example:
+ * <?php
+ *
  *     document_auth( 'Please authorize!', 'hello_world_auth' );
  *     function hello_world_auth($user, $pass) {
+ *       // Callback takes two parameters:
+ *       // 1st - $username
+ *       // 2nd - $password
  *
  *       if ($user == 'user1' && $pass == 'pass1') {
  *         return TRUE;
@@ -566,6 +599,7 @@ function set_document_downloadable($filename = '', $size = 0) {
  *       }
  *
  *     }
+ * ?>
  *
  * @param string $message
  * @param string $callback
@@ -751,8 +785,6 @@ if ( function_exists( 'is_utf8' ) ):
 /**
  * Checks whether a string is valid UTF-8.
  *
- * All credits to Drupal's team
- *
  * All functions designed to filter input should use drupal_validate_utf8
  * to ensure they operate on valid UTF-8 strings to prevent bypass of the
  * filter.
@@ -767,6 +799,8 @@ if ( function_exists( 'is_utf8' ) ):
  *
  * The function does not return FALSE for strings containing character codes
  * above U+10FFFF, even though these are prohibited by RFC 3629.
+ *
+ * @thanks Drupal team
  *
  * @param $text
  *   The text to check.
@@ -887,14 +921,16 @@ function CAST_TO_STRING($var = '', $length = FALSE, $implode_arrays = ' ') {
  * This function can cast any-type variables,
  * and safe return array value (objects, arrays, resources,..)
  *
- * CAST_TO_ARRAY('t1=test&t2=test2&hello=world')
- * // array(
- * //    't1' => 'test',
- * //    't2' => 'test2',
- * //    'hello' => 'world',
- * // );
+ * <?php
+ *   CAST_TO_ARRAY('t1=test&t2=test2&hello=world');
+ *   // array(
+ *   //    't1' => 'test',
+ *   //    't2' => 'test2',
+ *   //    'hello' => 'world',
+ *   // );
  *
- * CAST_TO_ARRAY('hello world') // array('hello world')
+ *   echo CAST_TO_ARRAY('hello world'); // array('hello world')
+ * ?>
  *
  * @param mixed value
  *
@@ -924,14 +960,16 @@ function CAST_TO_ARRAY( $var = array() ) {
  * This function can cast any-type variables,
  * and safe return array value (objects, arrays, resources,..)
  *
- * CAST_TO_OBJECT('t1=test&t2=test2&hello=world')
- * // stdClass {
- * //     $t1 = 'test';
- * //     $t2 = 'test2';
- * //     $hello = 'world';
- * // }
+ * <?php
+ *   CAST_TO_OBJECT('t1=test&t2=test2&hello=world');
+ *   // stdClass {
+ *   //     $t1 = 'test';
+ *   //     $t2 = 'test2';
+ *   //     $hello = 'world';
+ *   // }
  *
- * CAST_TO_OBJECT('hello world') // array('hello world')
+ *   CAST_TO_OBJECT('hello world') // array('hello world')
+ * ?>
  *
  * @param mixed value
  *
@@ -1313,8 +1351,8 @@ function filemime($file = '', $fallback_type = 'application-octet/stream') {
 }
 
 /**
- * Send mail based on php's mail() function, or custom one if hook send_mail_function is implemented
-
+ * Send mail based on php's mail() function, or custom one if hook send_mail_function is implemented.
+ *
  * @fire send_mail_headers
  * @fire send_mail_function
  *
@@ -1691,18 +1729,20 @@ function check_nonce($id = 'global', $nonce_key = '') {
 /**
  * Add hook callback.
  *
- * add_hook('test', 'hook_hello_world');
- * function hook_hello_world($content, $action = '') {
- *   if ($action === 'test1') {
- *     return $content . '!';
+ * <?php
+ *   add_hook('test', 'hook_hello_world');
+ *   function hook_hello_world($content, $action = '') {
+ *     if ($action === 'test1') {
+ *       return $content . '!';
+ *     }
+ *     return $content;
  *   }
- *   return $content;
- * }
  *
- * // PHP 5.3
- * add_hook( 'test', function($content) {
- *   return $content . ' :)';
- * });
+ *   // PHP 5.3
+ *   add_hook( 'test', function($content) {
+ *     return $content . ' :)';
+ *   });
+ * ?>
  *
  * @param string $hook_name
  * @param string|callback $function_name
@@ -1734,24 +1774,25 @@ function add_hook($hook_name, $function, $priority = 10) {
 /**
  * Fire a hook.
  *
- * $a = 'Hello World';
+ * <?php
+ *   $a = 'Hello World';
  *
- * add_hook('test', 'hook_hello_world');
- * function hook_hello_world($content, $action = '') {
- *   if ($action === 'test1') {
- *     return $content . '!';
+ *   add_hook('test', 'hook_hello_world');
+ *   function hook_hello_world($content, $action = '') {
+ *     if ($action === 'test1') {
+ *       return $content . '!';
+ *     }
+ *     return $content;
  *   }
- *   return $content;
- * }
  *
- * // PHP 5.3
- * add_hook( 'test', function($content) {
- *   return $content . ' :)';
- * });
+ *   // PHP 5.3
+ *   add_hook( 'test', function($content) {
+ *     return $content . ' :)';
+ *   });
  *
- * echo do_hook( 'test', $a, 'test1'); // Hello World! :)
- * echo do_hook( 'test', $a, 'nope');  // Hello World :)
- *
+ *   echo do_hook( 'test', $a, 'test1'); // Hello World! :)
+ *   echo do_hook( 'test', $a, 'nope');  // Hello World :)
+ * ?>
  *
  * @param string $hook_name
  * @param mixed $value
@@ -2280,9 +2321,11 @@ function human_time_diff( $from, $to = '' ) {
 /**
  * Simple alternator implementation.
  *
- * echo alternator('one', 'two', 'tree') // one
- * echo alternator('one', 'two', 'tree') // two
- * echo alternator('one', 'two', 'tree') // tree
+ * <?php
+ *   echo alternator('one', 'two', 'tree') // one
+ *   echo alternator('one', 'two', 'tree') // two
+ *   echo alternator('one', 'two', 'tree') // tree
+ * ?>
  *
  * @param mixed $arg1
  * @param mixed $arg2
@@ -2364,7 +2407,9 @@ function byte_format($num = 0, $precision = 2) {
 /**
  * Make path like string more readable.
  *
- * path_to_human('category/test-products') // Category Test Products
+ * <?php
+ *   echo path_to_human('category/test-products'); // Category Test Products
+ * ?>
  *
  * @param string $string
  *
@@ -2381,8 +2426,10 @@ function path_to_human($string = '') {
 /**
  * Make text look like a path.
  *
- * human_to_path('Category/Test Products') // category/test-products
- * human_to_path('33 Example MS Word document.docx') // 33-example-ms-word-document.docx
+ * <?php
+ *   echo human_to_path('Category/Test Products'); // category/test-products
+ *   echp human_to_path('33 Example MS Word document.docx'); // 33-example-ms-word-document.docx
+ * ?>
  *
  * @param string $string
  *
@@ -2400,7 +2447,9 @@ function human_to_path($string = '') {
 /**
  * Convert path a like string to assoc array.
  *
- * path_to_assoc('category/example/tag/test') // array( 'category' => 'example', 'tag' => 'test' )
+ * <?php
+ *   echo path_to_assoc('category/example/tag/test'); // array( 'category' => 'example', 'tag' => 'test' )
+ * ?>
  *
  * @param string $path
  * @param int $offset
@@ -2425,7 +2474,9 @@ function path_to_assoc($path = '', $offset = 0) {
 /**
  * Convert assoc array to path.
  *
- * assoc_to_path(array( 'category' => 'example', 'tag' => 'test' )) // category/example/tag/test
+ * <?php
+ *   echo assoc_to_path(array( 'category' => 'example', 'tag' => 'test' )); // category/example/tag/test
+ * ?>
  *
  * @param array $array.
  *
@@ -2517,7 +2568,9 @@ function substr_middle($string = '', $length = 255, $separate = '&#8230;') {
 /**
  * Strip duplicated chars.
  *
- * strip_duplicated_chars('Helllo MyyFriend __1') // Helo MyFriend _1
+ * <?php
+ *   echp strip_duplicated_chars('Helllo MyyFriend __1'); // Helo MyFriend _1
+ * ?>
  *
  * @param string $string
  *
@@ -2530,7 +2583,9 @@ function strip_duplicated_chars($string = '') {
 /**
  * Upper word by a char.
  *
- * ucwords_by_char('hello-world', '-') // Hello World
+ * <?php
+ *   echo ucwords_by_char('hello-world', '-'); // Hello World
+ * ?>
  *
  * @param string $string
  * @param string $char
@@ -2555,8 +2610,10 @@ function strip_whitespaces($text = '') {
 /**
  * Decimal to roman
  *
- * echo dec_to_roman(8); // VIII
- * echo dec_to_roman(21); // XXI
+ * <?php
+ *   echo dec_to_roman(8); // VIII
+ *   echo dec_to_roman(21); // XXI
+ * ?>
  *
  * @param int $decimal
  *
@@ -2599,7 +2656,9 @@ function num_to_month($num = 0, $long_names = FALSE) {
 /**
  * TI-framework transliteration implementation.
  *
- * echo transliterate('Здравей Свят!'); // Zdravei Svyat!
+ * <?php
+ *   echo transliterate('Здравей Свят!'); // Zdravei Svyat!
+ * ?>
  *
  * @fire transliterate
  *

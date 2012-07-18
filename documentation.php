@@ -36,7 +36,14 @@
   $functions_file = file( TI_PATH_FRAMEWORK . '/functions.php');
   $functions = get_defined_functions();
   $functions = $functions['user'];
-  sort($functions);
+
+  $hooks = array();
+  foreach ($functions_file as $line) {
+    if ( preg_match( '#@fire\ (\w+)#', $line, $hook)) {
+      $hooks[] = $hook[1];
+    }
+  }
+  //sort($functions);
 
 
 
@@ -58,9 +65,10 @@
             .helpblock { margin: 8px; padding: 8px; background: #fff; border: 1px solid #ccc; box-shadow: 0 0 12px #bbb; display: block; }
             .helpblock h3 { font-size: 18px; }
             .v-fire { color: #ce5c00; font-weight: bolder; }
+            .v-thanks { color: #810087; font-weight: bolder; }
             .v-see { color: #6d914c; font-weight: bolder; }
             .v-param { color: #2397c9; font-weight: bolder; }
-            .v-return { color: #333; font-weight: bolder; }
+            .v-return { color: #f00; font-weight: bolder; }
             .helpblock .code { background: #ddd; display: block; overflow: auto; font-family: monospace; font-size: 11px; }
         </style>
         <script src="http://code.jquery.com/jquery-1.7.2.min.js"></script>
@@ -108,6 +116,7 @@
                 <h5>.htaccess</h5>
                 <code class="code">
 <?php $htaccess = <<<EOL
+
   <IfModule mod_rewrite.c>
       RewriteEngine On
       RewriteRule ^index\.php$ - [L]
@@ -115,6 +124,7 @@
       RewriteCond %{REQUEST_FILENAME} !-d
       RewriteRule (.*) index.php [L]
   </IfModule>
+\n
 EOL;
 highlight_string($htaccess); unset($htaccess);?>
                 </code>
@@ -123,6 +133,11 @@ highlight_string($htaccess); unset($htaccess);?>
                 <h5>index.php</h5>
                 <code class="code">
 <?php $index = <<< EOL
+<?php
+
+  // ------------------------------------------------------------- //
+  // All these settings are optional, you can set them if you want //
+  // ------------------------------------------------------------- //
 
   // Path to application directory.
   //define( 'TI_PATH_APP',             dirname(__FILE__) . '/application' );
@@ -193,6 +208,7 @@ highlight_string($index);unset($index);?>
                     $docu = $fc->getDocComment();
                     echo strtr(highlight_string(preg_replace('#\n\s*(/\*\*|\*\/|\*)#', "\n", "\n" . $docu), 1),
                             array(
+                                '@thanks' => '<span class="v-thanks">@thanks</span>',
                                 '@fire' => '<span class="v-fire">@fire</span>',
                                 '@param' => '<span class="v-param">@param</span>',
                                 '@return' => '<span class="v-return">@return</span>',
