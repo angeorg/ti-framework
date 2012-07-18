@@ -89,7 +89,7 @@ function mbus($text = '') {
  *   add_hook('pdo_options', function($options, $data, $driver) {
  *
  *     if ($driver == 'mysql') {
- *       $options[PDO::MYSQL_ATTR_INIT_COMMAND] = 'SET NAMES cp1251';
+ *       $options[PDO::MYSQL_ATTR_INIT_COMMAND] = 'SET NAMES utf8';
  *     }
  *
  *     return $options;
@@ -99,8 +99,11 @@ function mbus($text = '') {
  *
  * @fire pdo_options
  *
- * @param string TI_DB_<ID>
+ * @param string $db_id
  *   default is empty, pointing to the TI_DB configuration
+ *   db() return db object with config from TI_DB
+ *   db('1') return db object with config from TI_DB_1
+ *   db('ib') return db object with config from TI_DB_ib
  *
  * @return PDO
  */
@@ -117,9 +120,9 @@ function db($db_id = '') {
     return NULL;
   }
 
-  $hash = md5($db_id);
+  $hash = md5( $db_id );
 
-  if (isset($databases[$hash])) {
+  if ( isset( $databases[$hash] ) ) {
     return $databases[$hash];
   }
 
@@ -310,7 +313,8 @@ function site_url($url = '') {
     $url = implode( '/', $url );
   }
 
-  $url = TI_PATH_WEB . ( TI_DISABLE_MOD_REWRITE ? '?' : '' ) .
+  $url = TI_PATH_WEB .
+         ( TI_DISABLE_MOD_REWRITE ? '?' : '' ) .
          preg_replace( '#\/{2,}#', '/', trim( $url, '/' ) . '/' );
 
   return do_hook( __FUNCTION__, $url );
@@ -436,7 +440,33 @@ function po_to_array($file = '') {
  * Locate locale and if exists, load
  * the locale can be .php (array file), or .po file
  *
- * @param string $locale
+ * <?php
+ *
+ *   load_locale('en_US');
+ *   // this will load path/to/app/locale/en_US.php
+ *   // or
+ *   // this will load path/to/app/locale/en_US.po
+ *   // depends what is available
+ *
+ * ?>
+ *
+ * example content of path/to/app/locale/en_US.php
+ * <?php
+ *   return array(
+ *     'hello' => 'hello',
+ *     'string' => 'String',
+ *   );
+ * ?>
+ *
+ * example content of path/to/app/locale/en_US.po
+ *
+ * msgid "hello"
+ * msgstr "hello"
+ *
+ * msgid "string"
+ * msgstr "String"
+ *
+ * @param string $Locale
  *   locale name
  *
  * @return bool
@@ -465,6 +495,18 @@ function load_locale($Locale = '') {
 /**
  * Get string translation
  *
+ * <?php
+ *   // override the string translation
+ *   add_hook('__', function($string) {
+ *
+ *     if ($string == 'hello') {
+ *       return 'Здравей';
+ *     }
+ *
+ *     return $string;
+ *
+ *   });
+ *
  * @fire __
  *
  * @param string $string
@@ -490,6 +532,15 @@ function _e($string = '') {
 
 /**
  * Plural translation
+ *
+ * <?php
+ *
+ *   echo _n('Cat', 'Cat', 1);
+ *   // Cat
+ *
+ *   echo _n('Comment', 'Comments', 2);
+ *   // Comments
+ * ?>
  *
  * @param string $string_single
  * @param string $string_plura
@@ -592,25 +643,26 @@ function set_document_downloadable($filename = '', $size = 0) {
  * Simple HTTP document authorisation
  *
  * <?php
- *     // Simple page authorisation.
- *     document_auth( 'Please authorize!', function($user, $pass) {
- *       // Callback takes two parameters:
- *       // 1st - $username
- *       // 2nd - $password
+ *   // Simple page authorization.
+ *   document_auth( 'Please authorize!', function($user, $pass) {
+ *     // Callback takes two parameters:
+ *     // 1st - $username
+ *     // 2nd - $password
  *
- *       if ($user == 'user1' && $pass == 'pass1') {
- *         return TRUE;
- *       }
- *       else {
- *         return FALSE;
- *       }
+ *     if ($user == 'user1' && $pass == 'pass1') {
+ *       return TRUE;
+ *     }
+ *     else {
+ *       return FALSE;
+ *     }
  *
- *     });
+ *   });
  * ?>
  *
  * @param string $message
  * @param string $callback
  *   callback that check user password
+ *   it should accept two parameters and return bool
  *
  * @return bool
  */
@@ -833,9 +885,9 @@ endif;
  *
  * @param mixed $var
  * @param int $min
- *   minimal value (optional)
+ *   minimal value
  * @param int $max
- *   maximal value (optional)
+ *   maximal value
  *
  * @return int
  */
@@ -860,9 +912,9 @@ function CAST_TO_INT($var = 0, $min = NULL, $max = NULL) {
  *
  * @param mixed $var
  * @param int $min
- *   minimal value (optional)
+ *   minimal value
  * @param int $max
- *   maximal value (optional)
+ *   maximal value
  *
  * @return double
  */
@@ -903,9 +955,9 @@ function CAST_TO_BOOL($var = FALSE) {
  *
  * @param mixed $var
  * @param int $length
- *   of casted string (optional)
+ *   of casted string
  * @param string $implode_arrays
- *   if value is array or object, glue that will implode it (optional)
+ *   if value is array or object, glue that will implode it
  *
  * @return string
  */
