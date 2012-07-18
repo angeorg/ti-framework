@@ -123,11 +123,6 @@ if ( '/favicon.ico' == $_SERVER['REQUEST_URI'] ) {
   exit;
 }
 
-if ( defined('TI_DOCUMENTATION') && is_string( TI_DOCUMENTATION ) && strcmp( $_SERVER['REQUEST_URI'], '/' . TI_DOCUMENTATION ) === 0 ) {
-  include TI_PATH_FRAMEWORK . '/documentation.php';
-  exit;
-}
-
 // Set appsecret salt.
 defined( 'TI_APP_SECRET' ) or define( 'TI_APP_SECRET', 'ti-framework' );
 
@@ -185,7 +180,7 @@ define( 'TI_IP', !empty($_SERVER['HTTP_CLIENT_IP'])
 
 // Set debugging mode.
 ini_set( 'log_errors', TRUE );
-if ( TI_DEBUG_MODE ) {
+if (1|| TI_DEBUG_MODE ) {
   error_reporting( E_ALL );
   ini_set( 'display_errors', 1 );
   ini_set( 'display_startup_errors', TRUE );
@@ -214,6 +209,15 @@ ini_set( 'session.use_only_cookies', 1 );
 // Include core functions.
 require TI_PATH_FRAMEWORK . '/functions.php';
 
+// Determine if the request is ajax or not.
+define( 'TI_IS_AJAX', ( strtolower( ifsetor( $_SERVER['HTTP_X_REQUESTED_WITH'] ) ) == 'xmlhttprequest') );
+
+// Here, because using some functions from the framework.
+if ( defined('TI_DOCUMENTATION') && is_string( TI_DOCUMENTATION ) && $_SERVER['REQUEST_URI'] === '/' . TI_DOCUMENTATION ) {
+  include TI_PATH_FRAMEWORK . '/documentation.php';
+  exit;
+}
+
 // Instantinate session.
 if ( !session_id() ) {
   session_start();
@@ -231,9 +235,6 @@ date_default_timezone_set( TI_TIMEZONE );
 
 // Set main locale.
 setlocale( LC_CTYPE, TI_LOCALE );
-
-// Determine if the request is ajax or not.
-define( 'TI_IS_AJAX', ( strtolower( ifsetor( $_SERVER['HTTP_X_REQUESTED_WITH'] ) ) == 'xmlhttprequest') );
 
 // Set ti error handler.
 set_error_handler( 'ti_error_handler' );

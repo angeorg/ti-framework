@@ -32,7 +32,6 @@
  */
 
 
-  include 'functions.php';
   $functions_file = file( TI_PATH_FRAMEWORK . '/functions.php');
   $functions = get_defined_functions();
   $functions = $functions['user'];
@@ -206,14 +205,14 @@ highlight_string($index);unset($index);?>
                     $fc = new ReflectionFunction($function);
                     echo '<h3>' . rtrim(trim($functions_file[$fc->getStartLine()-1]), '{') . '</h3>';
                     $docu = $fc->getDocComment();
-                    echo strtr(highlight_string(preg_replace('#\n\s*(/\*\*|\*\/|\*)#', "\n", "\n" . $docu), 1),
+                    echo make_clickable(strtr(highlight_string(preg_replace('#\n\s*(/\*\*|\*\/|\*)#', "\n", "\n" . $docu), 1),
                             array(
                                 '@thanks' => '<span class="v-thanks">@thanks</span>',
                                 '@fire' => '<span class="v-fire">@fire</span>',
                                 '@param' => '<span class="v-param">@param</span>',
                                 '@return' => '<span class="v-return">@return</span>',
                                 '@see' => '<span class="v-see">@see</span>',
-                            ));
+                            )));
               ?>
             </div>
             <?php endforeach?>

@@ -2125,14 +2125,19 @@ function form_options($array = array(), $default_value = NULL, $return = TRUE) {
  *
  * @return string
  */
-function do_clickable($text = '', $anchor_length = 40) {
+function make_clickable($text = '', $anchor_length = 40, $attributes = array('target' => '_blank')) {
 
-  $text = CAST_TO_STRING($text);
-  $anchor_length = CAST_TO_INT($anchor_length);
+  $text = CAST_TO_STRING( $text );
+  $anchor_length = CAST_TO_INT( $anchor_length );
 
-  $text = preg_replace('#(^|\s|\()((http(s?)://)|(w{2,4}\.))(\w+[^\s\)\<]+)#ei', '\'<a href="http\\4://\\5\\6">\'.character_limiter_middle("\\0", ' . $anchor_length . ').\'</a>\'', $text);
+  $attributes = CAST_TO_ARRAY( $attributes );
+  $custom_attributes = '';
+  foreach ($attributes as $key => $val) {
+    $custom_attributes .= ' ' . $key . '="' . htmlspecialchars($val) . '"';
+  }
 
-  $text = preg_replace('#\b([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,6})\b#ei', '\'<a href="mailto:\'.urlencode("\\0").\'">\'.character_limiter_middle("\\0", ' . $anchor_length . ').\'</a>\'', $text);
+  $text = preg_replace( '@(?<![.*">])\b(?:(?:https?|ftp|file)://|[a-z]\.)[-A-Z0-9+&#/%=~_|$?!:,.]*[A-Z0-9+&#/%=~_|$]@ei', '\'<a href="\0"'.$custom_attributes.'>\'.substr_middle("\\0", ' . $anchor_length . ').\'</a>\'', $text );
+  $text = preg_replace('#\b([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,6})\b#ei', '\'<a href="mailto:\'.urlencode("\\0").\'" '.$custom_attributes.'>\'.substr_middle("\\0", ' . $anchor_length . ').\'</a>\'', $text);
 
   return $text;
 }
