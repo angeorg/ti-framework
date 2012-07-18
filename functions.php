@@ -97,6 +97,10 @@ function mbus($text = '') {
  *   });
  * ?>
  *
+ * @see http://www.php.net/manual/en/pdo.drivers.php
+ *   About mysql driver before PHP 5.3.6, ti-framework have
+ *   built in competability for charset, so it is not ignored.
+ *
  * @fire pdo_options
  *
  * @param string $db_id
@@ -186,7 +190,7 @@ function is_cli() {
  * @return bool
  */
 function is_ajax() {
-  return do_hook( __FUNCTION__, TI_IS_AJAX );
+  return do_hook( 'is_ajax', TI_IS_AJAX );
 }
 
 /**
@@ -259,7 +263,7 @@ function is_mobile() {
     $is_mobile = TRUE;
   }
 
-  $is_mobile = do_hook( __FUNCTION__, $is_mobile, $user_agent, $accept );
+  $is_mobile = do_hook( 'is_mobile', $is_mobile, $user_agent, $accept );
 
   return CAST_TO_BOOL( $is_mobile );
 }
@@ -276,7 +280,7 @@ function is_mobile() {
 function match_url($pattern = '') {
   $pattern = '/' . strtr( preg_quote( trim( $pattern, '/' ) ), array( '%s' => '([^\/]+)', '%d' => '([0-9]+)' ) ) . '\/(.+)?';
   $matched = preg_match( '#^' . $pattern . '$#', $_SERVER['REQUEST_URI'] ) ? TRUE : FALSE;
-  $matched = do_hook( __FUNCTION__, $matched, $pattern, $_SERVER['REQUEST_URI'] );
+  $matched = do_hook( 'match_url', $matched, $pattern, $_SERVER['REQUEST_URI'] );
   return $matched;
 }
 
@@ -317,7 +321,7 @@ function site_url($url = '') {
          ( TI_DISABLE_MOD_REWRITE ? '?' : '' ) .
          preg_replace( '#\/{2,}#', '/', trim( $url, '/' ) . '/' );
 
-  return do_hook( __FUNCTION__, $url );
+  return do_hook( 'site_url', $url );
 }
 
 /**
@@ -522,7 +526,7 @@ function load_locale($Locale = '') {
 function __($string = '') {
   global $_LOCALE;
   $s1 = isset( $_LOCALE[$string] ) ? $_LOCALE[$string] : $string;
-  $s1 = do_hook( __FUNCTION__, $string, $s1 );
+  $s1 = do_hook( '__', $string, $s1 );
   return $s1;
 }
 
@@ -792,6 +796,7 @@ function between($value = 0, $min = 0, $max = 0) {
   return $min <= $value && $value <= $max ? TRUE : FALSE;
 }
 
+// Backward competability for PHP < 5.6.
 if ( !function_exists('ifsetor') ) {
   /**
    * Return variable value, if variable not exists, then create it
@@ -1648,61 +1653,76 @@ function fileupload_get_size_limit() {
 }
 
 // Backward competable for sys_get_tem_dir().
-if ( !function_exists('sys_get_temp_dir') ) {
-  function sys_get_temp_dir() {
-    if (($temp = getenv('TMP')) !== FALSE) {
-      return $temp;
-    }
-    elseif (($temp = getenv('TEMP')) !== FALSE)
+if ( !function_exists('sys_get_temp_dir') ):
+/**
+ * Returns directory path used for temporary files
+ *
+ * @see http://php.net/manual/en/function.sys-get-temp-dir.php
+ *
+ * @return string
+ */
+function sys_get_temp_dir() {
+  if (($temp = getenv('TMP')) !== FALSE) {
     return $temp;
-    elseif (($temp = getenv('TMPDIR')) !== FALSE)
-    return $temp;
-    elseif (($temp = ini_get('upload_tmp_dir')) !== NULL)
-    return $temp;
-    else {
-      return TI_PATH_APP . '/tmp';
-    }
+  }
+  elseif (($temp = getenv('TEMP')) !== FALSE)
+  return $temp;
+  elseif (($temp = getenv('TMPDIR')) !== FALSE)
+  return $temp;
+  elseif (($temp = ini_get('upload_tmp_dir')) !== NULL)
+  return $temp;
+  else {
+    return TI_PATH_APP . '/tmp';
   }
 }
+endif;
 
 // Backward competable for parse_ini_string().
-if ( !function_exists('parse_ini_string') ) {
+if ( !function_exists('parse_ini_string') ):
+/**
+ * Parse a configuration string
+ *
+ * @see http://bg2.php.net/parse_ini_string
+ *
+ * @param string $string
+ * @param bool $process_sections
+ *
+ * @return array
+ */
+function parse_ini_string($string, $process_sections = FALSE) {
+  $lines = explode(NL, CAST_TO_STRING($string));
+  $return = array();
+  $in_sect = FALSE;
 
-  function parse_ini_string($string, $process_sections = FALSE) {
-    $lines = explode(NL, CAST_TO_STRING($string));
-    $return = array();
-    $in_sect = FALSE;
+  foreach ($lines as $line) {
+    $line = trim($line);
 
-    foreach ($lines as $line) {
-      $line = trim($line);
-
-      if (!$line || $line[0] == '#' || $line[0] == ';') {
-        continue;
-      }
-
-      if ($line[0] == '[' && $end_index = strpos($line, ']')) {
-        $in_sect = substr($line, 1, $end_index - 1);
-        continue;
-      }
-
-      if (strpos($line, '=')) {
-        $keyval = explode('=', $line, 2);
-      }
-      else {
-        $keyval = array('', $line);
-      }
-
-      if ($process_sections && $in_sect) {
-        $return[$in_section][trim($keyval[0], '"\' ')] = trim($keyval[1], '"\' ');
-      }
-      else {
-        $return[trim($keyval [0], '"\' ')] = trim($keyval[1], '"\' ');
-      }
+    if (!$line || $line[0] == '#' || $line[0] == ';') {
+      continue;
     }
-    return $return;
-  }
 
+    if ($line[0] == '[' && $end_index = strpos($line, ']')) {
+      $in_sect = substr($line, 1, $end_index - 1);
+      continue;
+    }
+
+    if (strpos($line, '=')) {
+      $keyval = explode('=', $line, 2);
+    }
+    else {
+      $keyval = array('', $line);
+    }
+
+    if ($process_sections && $in_sect) {
+      $return[$in_section][trim($keyval[0], '"\' ')] = trim($keyval[1], '"\' ');
+    }
+    else {
+      $return[trim($keyval [0], '"\' ')] = trim($keyval[1], '"\' ');
+    }
+  }
+  return $return;
 }
+endif;
 
 /**
  * Quick way to set cookie.
@@ -2514,7 +2534,8 @@ function byte_format($num = 0, $precision = 2) {
  * Make path like string more readable.
  *
  * <?php
- *   echo path_to_human('category/test-products'); // Category Test Products
+ *   echo path_to_human('category/test-products');
+ *   // Category Test Products
  * ?>
  *
  * @param string $string
@@ -2533,8 +2554,11 @@ function path_to_human($string = '') {
  * Make text look like a path.
  *
  * <?php
- *   echo human_to_path('Category/Test Products'); // category/test-products
- *   echp human_to_path('33 Example MS Word document.docx'); // 33-example-ms-word-document.docx
+ *   echo human_to_path('Category/Test Products');
+ *   // category/test-products
+ *
+ *   echo human_to_path('33 Example MS Word document.docx');
+ *   // 33-example-ms-word-document.docx
  * ?>
  *
  * @param string $string
@@ -2554,7 +2578,8 @@ function human_to_path($string = '') {
  * Convert path a like string to assoc array.
  *
  * <?php
- *   echo path_to_assoc('category/example/tag/test'); // array( 'category' => 'example', 'tag' => 'test' )
+ *   echo path_to_assoc('category/example/tag/test');
+ *   // array( 'category' => 'example', 'tag' => 'test' )
  * ?>
  *
  * @param string $path
@@ -2600,6 +2625,8 @@ function assoc_to_path($array = array()) {
 /**
  * Text formatter. Convert some chars to special ones, get more visual kandy.
  *
+ * @fire text_pretty_format
+ *
  * @param string $string
  *
  * @return string
@@ -2621,7 +2648,7 @@ function text_pretty_format($string = '') {
   $string = preg_replace( '#\"([^\"]*)\"#', '&ldquo;$1&rdquo;', $string );
   $string = preg_replace( '#\'([^\']*)\'#', '&lsquo;$1&rsquo;', $string );
 
-  do_hook(__FUNCTION__, $string);
+  do_hook( 'text_pretty_format', $string );
 
   return $string;
 }
@@ -2796,7 +2823,7 @@ function transliterate($string = '', $from_latin = FALSE) {
       'ㄔ' => 'c', 'ㄚ' => 'a', 'ㄞ' => 'ai', 'ㄢ' => 'an', 'ㄤ' => 'ar', 'ㄅ' => 'b', 'ㄅ' => 'be', 'ㄠ' => 'sw', 'ㄓ' => 'jw'
   );
 
-  $ctable = do_hook( __FUNCTION__, $ctable );
+  $ctable = do_hook( 'transliterate', $ctable );
 
   if ( $from_latin ) {
     array_flip( $ctable );

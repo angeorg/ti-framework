@@ -77,7 +77,8 @@ function _ti_application_routes() {
 
   if ( $routes === NULL ) {
     if ( TI_RULES_CACHE && cache_exists( 'ti://rules-cache', TI_RULES_CACHE )) {
-      return explode("\n", cache_get( 'ti://rules-cache', TI_RULES_CACHE ));
+      $routes = explode("\n", cache_get( 'ti://rules-cache', TI_RULES_CACHE ));
+      return $routes;
     }
 
     $routes = _ti_application_find_routes_fd( TI_PATH_APP . '/' . TI_FOLDER_CONTROLLER );
