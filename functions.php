@@ -281,10 +281,17 @@ function match_url($pattern = '') {
  * Generate url for application's path
  *
  * <?php
+ *   // Example usage with one argument
+ *   echo '<a href="' . site_url('path/to/page') . '">example link</a>';
+ *
+ *   // Example usage with N arguments
+ *   echo '<a href="' . site_url('path', 'to', $pagename) . '">example link</a>';
+ *
  *   // Replace the domain
  *   add_hook('site_url', function($url) {
  *     return str_replace($url, 'http://example.com', 'http://example2.com');
  *   });
+ * ?>
  *
  * @fire site_url
  *
@@ -319,7 +326,8 @@ function current_url() {
 }
 
 /**
- * Get the base url for application
+ * Get the base url for application, it is always trailingslash,
+ * because the requirement for TI_PATH_WEB
  *
  * @param string library name
  *
@@ -584,9 +592,8 @@ function set_document_downloadable($filename = '', $size = 0) {
  * Simple HTTP document authorisation
  *
  * <?php
- *
- *     document_auth( 'Please authorize!', 'hello_world_auth' );
- *     function hello_world_auth($user, $pass) {
+ *     // Simple page authorisation.
+ *     document_auth( 'Please authorize!', function($user, $pass) {
  *       // Callback takes two parameters:
  *       // 1st - $username
  *       // 2nd - $password
@@ -598,7 +605,7 @@ function set_document_downloadable($filename = '', $size = 0) {
  *         return FALSE;
  *       }
  *
- *     }
+ *     });
  * ?>
  *
  * @param string $message
@@ -1166,6 +1173,15 @@ function implode_r($glue = '', $pieces = array()) {
  * Work like as explode() but instead of $limit, here $elements_number,
  * means the returner array, always will be $elements_number long.
  *
+ * <?php
+ *   print_r( explode_n(',', 'hello,world', 3, '' ) );
+ *   // array(
+ *   //   0 => 'hello',
+ *   //   1 => 'world',
+ *   //   2 => '',
+ *   // );
+ * ?>
+ *
  * @param string $delimeter
  * @param string $string
  * @param int $elements_number
@@ -1234,7 +1250,7 @@ function copydir($source, $destination, $directory_permission = 0755, $file_perm
 }
 
 /**
- * Perform a regex (perl) search for files in directory.
+ * Perform a regex (perl derived) search for files in directory.
  *
  * @param string $directory
  *   directory root to search in (subfolders are included)
@@ -1356,10 +1372,14 @@ function filemime($file = '', $fallback_type = 'application-octet/stream') {
  * @fire send_mail_headers
  * @fire send_mail_function
  *
+ * @see mail()
+ *
  * @param string $to
  * @param string $subject
  * @param string $message
  * @param mixed $header
+ *
+ * @return bool
  */
 function send_mail($to = '', $subject = '(No subject)', $message = '', $header = '') {
 
@@ -2078,6 +2098,11 @@ function evalute_php($string, $local_variables = array(), $return = FALSE, &$res
  * Evalute math expressions, and return calculated in a double format,
  * or return FALSE if cause a error.
  *
+ * <?php
+ *   var_dump( evalute_math( '1+1(3x3)+1*2+8-4/2' ) );
+ *   // (double) 18
+ * ?>
+ *
  * @param string $math_string
  * @param string &$sanitized_string
  *
@@ -2153,6 +2178,14 @@ function evalute_math( $string = '', &$sanitized_string = '' ) {
 /**
  * Check if string is compa separated numerics.
  *
+ * <?php
+ *   is_123_set('1,2,3,4');
+ *   // TRUE
+ *
+ *   is_123_set('1,2,a,b,c');
+ *   // FALSE
+ * ?>
+ *
  * @param string $string
  * @param int $min
  *   minimum values
@@ -2170,6 +2203,14 @@ function is_123_set($string = '', $min = 0, $max = NULL) {
 /**
  * Check if string is coma separated A-Za-z
  *
+ * <?php
+ *   is_123_set('a,b,cd,ef');
+ *   // TRUE
+ *
+ *   is_123_set('1,2,a,b,c');
+ *   // FALSE
+ * ?>
+ *
  * @param string $string
  * @param int $min
  *   minimum values
@@ -2186,6 +2227,14 @@ function is_abc_set($string = '', $min = 0, $max = NULL) {
 
 /**
  * Check if string is coma separated alphanumeric
+ *
+ * <?php
+ *   is_123_set('1,2,3,4');
+ *   // TRUE
+ *
+ *   is_123_set('1,2,a,b,c');
+ *   // TRUE
+ * ?>
  *
  * @param string $string
  * @param int $min
@@ -2235,7 +2284,7 @@ function is_email($string = '') {
 }
 
 /**
- * Check if string is valid IPv4 address
+ * Check if string is valid ip address
  *
  * @param string $string
  * @param bool $ipv6
@@ -2276,7 +2325,7 @@ function sec_to_min_hour($secs = 0, $format = '%02d:%02d:%02d') {
  * The difference is returned in a human readable format such as "1 hour",
  * "5 mins", "2 days".
  *
- * All credits to WordPress team.
+ * @thanks WordPress team
  *
  * @param int $from Unix timestamp from which the difference begins.
  * @param int $to Optional. Unix timestamp to end the time difference. Default becomes time() if not set.
@@ -2322,9 +2371,9 @@ function human_time_diff( $from, $to = '' ) {
  * Simple alternator implementation.
  *
  * <?php
- *   echo alternator('one', 'two', 'tree') // one
- *   echo alternator('one', 'two', 'tree') // two
- *   echo alternator('one', 'two', 'tree') // tree
+ *   echo alternator('one', 'two', 'tree'); // one
+ *   echo alternator('one', 'two', 'tree'); // two
+ *   echo alternator('one', 'two', 'tree'); // tree
  * ?>
  *
  * @param mixed $arg1
