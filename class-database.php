@@ -56,7 +56,7 @@ class Database extends PDO {
    * @return string
    */
   public function db_table($tablename = '') {
-    return $this->db_squote($this->prefix . $tablename);
+    return $this->db_squote( $this->prefix . $tablename );
   }
 
   /**
@@ -69,8 +69,8 @@ class Database extends PDO {
    * @return string
    */
   public function db_squote($key = '') {
-    if ($key) {
-      switch ($this->getDriver()) {
+    if ( $key ) {
+      switch ( $this->getDriver() ) {
         case 'interbase': $sq = '"'; break;
         case 'mysql': default: $sq = '`';
       }
@@ -87,7 +87,7 @@ class Database extends PDO {
    * @return string
    */
   public function getDriver() {
-    return $this->getAttribute(PDO::ATTR_DRIVER_NAME);
+    return $this->getAttribute( PDO::ATTR_DRIVER_NAME );
   }
 
   /**
@@ -106,12 +106,12 @@ class Database extends PDO {
 
     $args = CAST_TO_ARRAY( $args );
 
-    $query = parent::prepare($querystr);
-    $query->setFetchMode(PDO::FETCH_OBJ);
-    $query->execute($args);
+    $query = parent::prepare( $querystr );
+    $query->setFetchMode( PDO::FETCH_OBJ) ;
+    $query->execute( $args );
 
-    if (TI_DEBUG_MODE && (int) $query->errorCode()) {
-      show_error('Database error', vsprintf('<p><strong>%s</strong> %s</p><p>%s</p>', $query->errorInfo()));
+    if ( TI_DEBUG_MODE && (int) $query->error Code() ) {
+      show_error( 'Database error', vsprintf('<p><strong>%s</strong> %s</p><p>%s</p>', $query->errorInfo() ) );
     }
 
     return $query;
@@ -297,7 +297,7 @@ class Database extends PDO {
         $querystr .= $this->build_keypair_clause($condition, $args, 'WHERE', 'AND');
     }
 
-    return $this->query($querystr, $args);
+    return $this->query( $querystr, $args )->fetchAll( PDO::FETCH_OBJ );
   }
 
 }

@@ -71,6 +71,8 @@ function _ti_application_find_routes_fd($adir, $rdir = '') {
 /**
  * Get all routes in the application
  *
+ * @fire application_routes
+ *
  * @access private
  *
  * @return array
@@ -80,20 +82,22 @@ function _ti_application_routes() {
   static $routes = NULL;
 
   if ( $routes === NULL ) {
+
     if ( TI_RULES_CACHE && cache_exists( 'ti://rules-cache', TI_RULES_CACHE )) {
       $routes = explode( NL, cache_get( 'ti://rules-cache', TI_RULES_CACHE ) );
-      return $routes;
     }
+    else {
 
-    $routes = _ti_application_find_routes_fd( TI_PATH_APP . '/' . TI_FOLDER_CONTROLLER );
-    asort( $routes );
+      $routes = _ti_application_find_routes_fd( TI_PATH_APP . '/' . TI_FOLDER_CONTROLLER );
+      asort( $routes );
+      if ( TI_RULES_CACHE ) {
+        cache_put( 'ti://rules-cache', implode( NL, $routes ) );
+      }
 
-    if ( TI_RULES_CACHE ) {
-      cache_put( 'ti://rules-cache', implode( NL, $routes ) );
     }
   }
 
-  return $routes;
+  return do_hook( 'application_routes', $routes );
 }
 
 /**
@@ -113,7 +117,6 @@ class Application {
    * @access public
    *
    * @param string $url
-   * @param string $return
    *
    * @return Application
    */
@@ -127,20 +130,21 @@ class Application {
   /**
    * Load URL and process it.
    *
-   * @fire application_routes
+   * @fire application_load_url
    *
    * @access public
    *
    * @param string $url
-   * @param array $share_vars
-   * @param bool $return
    *
    * @return string|NULL
    */
   public function load($url = '') {
 
     $url = '/' . trim( $url, '/' );
+
     $this->arguments = array();
+
+    $url = do_hook( 'application_load_url', $url );
 
     // Protect private controllers.
     if (self::$is_main && preg_match('#\/(\_|\.)#', $url) ) {
@@ -157,8 +161,9 @@ class Application {
       }
       return TRUE;
     }
+
     $rules = _ti_application_routes();
-    $rules = do_hook( 'application_routes', $rules );
+
     foreach ($rules as $rule) {
       if (!$rule) {
         continue;
