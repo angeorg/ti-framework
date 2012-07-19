@@ -81,7 +81,7 @@ function _ti_application_routes() {
 
   if ( $routes === NULL ) {
     if ( TI_RULES_CACHE && cache_exists( 'ti://rules-cache', TI_RULES_CACHE )) {
-      $routes = explode("\n", cache_get( 'ti://rules-cache', TI_RULES_CACHE ));
+      $routes = explode( NL, cache_get( 'ti://rules-cache', TI_RULES_CACHE ) );
       return $routes;
     }
 
@@ -89,7 +89,7 @@ function _ti_application_routes() {
     asort( $routes );
 
     if ( TI_RULES_CACHE ) {
-      cache_put( 'ti://rules-cache', implode( "\n", $routes ) );
+      cache_put( 'ti://rules-cache', implode( NL, $routes ) );
     }
   }
 
@@ -97,7 +97,7 @@ function _ti_application_routes() {
 }
 
 /**
- * Main Application class, provide a flexible MVC separation.
+ * Main Application class, provide a flexible MVC alike separation.
  */
 class Application {
 
@@ -137,7 +137,7 @@ class Application {
    *
    * @return string|NULL
    */
-  function load($url = '') {
+  public function load($url = '') {
 
     $url = '/' . trim( $url, '/' );
     $this->arguments = array();

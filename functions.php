@@ -189,6 +189,27 @@ function is_cli() {
 }
 
 /**
+ * Determine if SSL is used.
+ *
+ * @return bool
+ *   True if SSL, false if not used.
+ */
+function is_ssl() {
+  if ( !empty($_SERVER['HTTPS']) ) {
+    if ( strtolower($_SERVER['HTTPS']) == 'on' ) {
+      return TRUE;
+    }
+    if ( $_SERVER['HTTPS'] == '1' ) {
+      return TRUE;
+    }
+  }
+  elseif ( isset($_SERVER['SERVER_PORT']) && ( $_SERVER['SERVER_PORT'] == '443' ) ) {
+    return TRUE;
+  }
+  return FALSE;
+}
+
+/**
  * Is the application run from ajax query
  *
  * @fire is_ajax
@@ -804,7 +825,7 @@ function show_404($message = '') {
 function show_error($title = 'Error', $message = 'An error occurred.', $errno = 000) {
 
   if ( is_readable( TI_PATH_APP . '/' . TI_FOLDER_CONTROLLER .'/' . $errno . TI_EXT_CONTROLLER) ) {
-    Application::load('/' . $errno);
+    include TI_PATH_APP . '/' . TI_FOLDER_CONTROLLER .'/' . $errno . TI_EXT_CONTROLLER;
     exit;
   }
   else {
@@ -819,12 +840,16 @@ function show_error($title = 'Error', $message = 'An error occurred.', $errno = 
  * Framework's error handle, show/hide errors, make logs
  * Internal callback, please do not use it directly.
  *
+ * @fire error_handler
+ *
  * @param int $errno
  * @param string $errstr
  * @param string $errfile
  * @param int $errline
  */
 function ti_error_handler($errno, $errstr, $errfile, $errline) {
+
+  do_hook( 'error_handler', $errno, $errstr, $errfile, $errline );
 
   if ( !TI_DEBUG_MODE ) {
     return TRUE;
@@ -937,13 +962,14 @@ if ( function_exists( 'is_utf8' ) ):
  *   TRUE if the text is valid UTF-8, FALSE if not.
  */
 function is_utf8($text) {
+
   if ( strlen($text) == 0 ) {
     return TRUE;
   }
   // With the PCRE_UTF8 modifier 'u', preg_match() fails silently on strings
   // containing invalid UTF-8 byte sequences. It does not reject character
   // codes above U+10FFFF (represented by 4 or more octets), though.
-  return (preg_match('/^./us', $text) == 1);
+  return ( preg_match('/^./us', $text ) == 1 );
 }
 endif;
 
@@ -1274,19 +1300,19 @@ function array_get_by_path($path = '/', $array = array()) {
  * @return array
  */
 function implode_r($glue = '', $pieces = array()) {
-  if (is_array($glue)) {
+  if ( is_array($glue) ) {
     $pieces = $glue;
     $glue = ', ';
   }
-  foreach ($pieces as &$p) {
-    if (is_array($p)) {
-      $p = implode_r($glue, $p);
+  foreach ( $pieces as &$p ) {
+    if ( is_array($p) ) {
+      $p = implode_r( $glue, $p );
     }
-    elseif (is_object($p)) {
-      $p = implode_r($glue, CAST_TO_ARRAY($p));
+    elseif ( is_object($p) ) {
+      $p = implode_r( $glue, CAST_TO_ARRAY($p) );
     }
   }
-  return implode($glue, $pieces);
+  return implode( $glue, $pieces );
 }
 
 /**
@@ -1341,23 +1367,23 @@ function explode_n($delimeter = ',', $string = '', $elements_number = 1, $defaul
 function copydir($source, $destination, $directory_permission = 0755, $file_permission = 0755) {
 
   $cf = 0;
-  if (!is_dir($source)) {
+  if ( !is_dir($source) ) {
     return 0;
   }
   $dir = opendir($source);
 
-  if (!is_dir($destination) || !mkdir($destination, $directory_permission, TRUE)) {
+  if ( !is_dir( $destination ) || !mkdir( $destination, $directory_permission, TRUE )) {
     return 0;
   }
 
-  if (!$dir) {
+  if ( !$dir ) {
     return 0;
   }
 
-  while (FALSE !== ($file = readdir($dir))) {
-    if ($file != '.' && $file != '..') {
-      if (is_dir($source . '/' . $file)) {
-        $cf += copydir($source . '/' . $file, $destination . '/' . $file, $directory_permission, $file_permission);
+  while ( FALSE !== ( $file = readdir( $dir ) ) ) {
+    if ( $file != '.' && $file != '..' ) {
+      if ( is_dir( $source . '/' . $file ) ) {
+        $cf += copydir( $source . '/' . $file, $destination . '/' . $file, $directory_permission, $file_permission );
         chmod( $destination . '/' . $file, $file_permission );
       }
       elseif ( copy( $source . '/' . $file, $destination . '/' . $file ) ) {
@@ -1366,7 +1392,7 @@ function copydir($source, $destination, $directory_permission = 0755, $file_perm
       }
     }
   }
-  closedir($dir);
+  closedir( $dir );
   return $cf;
 }
 
@@ -1385,13 +1411,13 @@ function find_file($directory = '.', $pattern = '', $skip_hidden = TRUE) {
 
   $list = array();
 
-  if ( !($dir = opendir( $directory )) ) {
+  if ( !( $dir = opendir( $directory ) ) ) {
     return $list;
   }
 
   while ( FALSE !== ($file = readdir( $dir)) ) {
 
-    if ($skip_hidden && $file{0} == '.') {
+    if ( $skip_hidden && $file{0} == '.' ) {
       continue;
     }
 
@@ -1402,7 +1428,7 @@ function find_file($directory = '.', $pattern = '', $skip_hidden = TRUE) {
       $list[] = $directory . '/' . $file;
     }
   }
-  closedir($dir);
+  closedir( $dir );
   return $list;
 }
 
@@ -1565,7 +1591,7 @@ function http_query($url, $type = 'GET', $data = NULL, &$header = '', $timeout =
 
   if ( $query['query'] || $data ) {
     parse_str($query['query'], $data2);
-    if ( is_scalar($data) ) {
+    if ( is_scalar( $data ) ) {
       parse_str( $data, $data );
     }
   }
@@ -1604,22 +1630,22 @@ function http_query($url, $type = 'GET', $data = NULL, &$header = '', $timeout =
       fputs( $fp, $key . ': ' . $val . "\r\n" );
     }
 
-    fputs($fp, 'Connection: close' . "\r\n\r\n" );
+    fputs( $fp, 'Connection: close' . "\r\n\r\n" );
     if ( $query['query'] ) {
-      fputs($fp, $query['query'] . "\r\n\r\n" );
+      fputs( $fp, $query['query'] . "\r\n\r\n" );
     }
 
     $result = '';
     while ( !feof($fp) ) {
-      $result .= fgets($fp, 4096);
+      $result .= fgets( $fp, 4096 );
     }
 
     fclose($fp);
 
-    $result = explode("\r\n\r\n", $result, 2);
+    $result = explode( "\r\n\r\n", $result, 2 );
     $header = array_shift($result);
 
-    return CAST_TO_STRING(array_shift($result));
+    return CAST_TO_STRING( array_shift( $result ) );
   }
 }
 
@@ -1633,15 +1659,15 @@ function http_query($url, $type = 'GET', $data = NULL, &$header = '', $timeout =
  */
 function is_writable_real( $filename = '') {
 
-  if (file_exists($filename)) {
-    return is_writable($filename);
+  if ( file_exists( $filename ) ) {
+    return is_writable( $filename );
   }
   else {
-    if (!$handle = fopen($filename, 'ab')) {
+    if ( !$handle = fopen( $filename, 'ab' ) ) {
       return FALSE;
     }
-    fclose($handle);
-    unlink($filename);
+    fclose( $handle );
+    unlink( $filename );
     return TRUE;
   }
 }
@@ -1655,7 +1681,7 @@ function is_writable_real( $filename = '') {
  */
 function make_hash($string = '') {
 
-  if (!$string) {
+  if ( !$string ) {
     return '';
   }
 
@@ -1696,7 +1722,7 @@ function fileupload_get_size_limit() {
 
   static $fileupload_get_size_limit = 0;
 
-  if ($fileupload_get_size_limit) {
+  if ( $fileupload_get_size_limit ) {
     return $fileupload_get_size_limit;
   }
 

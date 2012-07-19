@@ -31,7 +31,6 @@
  * USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-
   $functions_file = file( TI_PATH_FRAMEWORK . '/functions.php');
   $functions = get_defined_functions();
   $functions = $functions['user'];
@@ -42,9 +41,6 @@
       $hooks[] = $hook[1];
     }
   }
-
-  //sort($functions);
-
 ?>
 <!doctype html>
 <html>
@@ -52,6 +48,10 @@
         <title> ti-framework v<?php echo TI_FW_VERSION?> </title>
         <style>
             * { margin: 0; padding: 0; -webkit-transition: all 0.3s ease-in-out; transition: all 0.3s ease-in-out; }
+            ::-webkit-scrollbar { padding: 5px; width: 6px; height: 6px; }
+            ::-webkit-scrollbar-track { background-color: rgba(0, 0, 0, 0.1); }
+            ::-webkit-scrollbar-thumb { background-color: rgba(0, 0, 0, 0.5); border-radius: 4px; }
+            ::-webkit-scrollbar-thumb:hover { background-color: rgba(0, 0, 0, 0.7); }
             body { background: #eee; color: #111; font: normal 12px sans-serif; }
             a { color: #3b748c; }
             .navigation { overflow: auto; width: 20%; height: 100%; position: fixed; }
@@ -69,23 +69,7 @@
             .v-param { color: #2397c9; font-weight: bolder; }
             .v-return { color: #f00; font-weight: bolder; }
             .helpblock .code { background: #ddd; display: block; overflow: auto; font-family: monospace; font-size: 11px; }
-            ::-webkit-scrollbar { padding: 5px; width: 6px; height: 6px; }
-            ::-webkit-scrollbar-track { background-color: rgba(0, 0, 0, 0.1); }
-            ::-webkit-scrollbar-thumb { background-color: rgba(0, 0, 0, 0.5); border-radius: 4px; }
-            ::-webkit-scrollbar-thumb:hover { background-color: rgba(0, 0, 0, 0.7); }
         </style>
-        <script src="http://code.jquery.com/jquery-1.7.2.min.js"></script>
-        <script>
-            $(function() {
-                $('.navigation a').click(function() {
-                    b = $(this).attr('href');
-                    //$('.helpblock').css('display', 'none');
-                    //$(b).show();
-
-                })
-                //$($('.helpblock')[0]).show();
-            })
-        </script>
     </head>
     <body>
         <div class="navigation">
@@ -166,16 +150,16 @@ highlight_string($htaccess); unset($htaccess);?>
   //define( 'TI_TIMEZONE',             'GMT' );
 
   // Set MVC folders
-  //define( 'TI_FOLDER_MODEL',         'class' );
+  //define( 'TI_FOLDER_INC',           'includes' );
   //define( 'TI_FOLDER_VIEW',          'html' );
   //define( 'TI_FOLDER_CONTROLLER',    'www' );
 
   // Set MVC file extensions
-  //define( 'TI_EXT_MODEL',            '.php' );
+  //define( 'TI_EXT_INC',              '.php' );
   //define( 'TI_EXT_VIEW',             '.html' );
   //define( 'TI_EXT_CONTROLLER',       '.php' );
 
-  // Autorenderer, it call \$this->render() method with parameter controller name.
+  // Autorenderer, it call render() method with parameter controller name.
   //define( 'TI_AUTORENDER',           TRUE );
 
   // Cache controller rules for faster routing.
@@ -201,10 +185,7 @@ highlight_string($htaccess); unset($htaccess);?>
 EOL;
 highlight_string($index);unset($index);?>
                 </code>
-
-
               </div>
-
               <?php foreach ( $functions as $function ):?>
               <div id="function-<?php echo $function?>" class="helpblock">
               <?php

@@ -38,7 +38,7 @@ define( 'TI_FW_VERSION', '0.9.6' );
 define( 'TI_TIMER_START', microtime( TRUE ) );
 
 // Check for PHP version.
-if ( version_compare(PHP_VERSION, '5.2.0', '<') ) {
+if ( version_compare( PHP_VERSION, '5.2.0', '<' ) ) {
   die( 'REQUIRE PHP >= 5.2.0' );
 }
 
@@ -160,7 +160,7 @@ defined( 'TI_LOCALE' )              or define( 'TI_LOCALE', 'en_US' );
 defined( 'TI_FOLDER_LOCALE' )       or define( 'TI_FOLDER_LOCALE', 'locale' );
 defined( 'TI_TIMEZONE' )            or define( 'TI_TIMEZONE', 'GMT' );
 
-// Set MVC folders, if they are not set already by the config file.
+// Set MVC alike folders, if they are not set already by the config file.
 defined( 'TI_FOLDER_INC' )          or define( 'TI_FOLDER_INC', 'includes' );
 defined( 'TI_FOLDER_VIEW' )         or define( 'TI_FOLDER_VIEW', 'html' );
 defined( 'TI_FOLDER_CONTROLLER' )   or define( 'TI_FOLDER_CONTROLLER', 'www' );
@@ -183,8 +183,7 @@ define( 'TI_IP', !empty($_SERVER['HTTP_CLIENT_IP'])
     ));
 
 // Set debugging mode.
-ini_set( 'log_errors', TRUE );
-if (1|| TI_DEBUG_MODE ) {
+if ( TI_DEBUG_MODE ) {
   error_reporting( E_ALL );
   ini_set( 'display_errors', 1 );
   ini_set( 'display_startup_errors', TRUE );
@@ -205,10 +204,6 @@ ini_set( 'url_rewriter.tags', '' );
 ini_set( 'magic_quotes_gpc', '0' );
 ini_set( 'magic_quotes_runtime', '0' );
 ini_set( 'magic_quotes_sybase', '0' );
-ini_set( 'session.use_trans_sid', 0 );
-ini_set( 'session.cache_limiter', 'none' );
-ini_set( 'session.gc_probability', 0 );
-ini_set( 'session.use_only_cookies', 1 );
 
 // Include core functions.
 require TI_PATH_FRAMEWORK . '/functions.php';
@@ -249,22 +244,10 @@ if ( defined('TI_DOCUMENTATION') && is_string( TI_DOCUMENTATION ) && $_SERVER['R
   exit;
 }
 
-// Prevent outputing from the __application.
-if ( !ob_list_handlers() ) {
-  ob_start();
-}
-
 // Check for __application.php
 if ( is_readable( TI_PATH_APP . '/__application.php' ) ) {
   include TI_PATH_APP . '/__application.php';
 }
-
-// Cleaning the buffer
-ob_end_clean();
-
-// Fire the init hook.
-// @fire init
-do_hook( 'init' );
 
 // Let boot the app.
 $Application = new Application( $_SERVER['REQUEST_URI'] );
