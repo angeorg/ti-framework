@@ -149,13 +149,18 @@ function db($db_id = '') {
 
   foreach (PDO::getAvailableDrivers() as $driver) {
     if (isset($cred[$driver . ':dbname'])) {
+
       try {
+
         $options = array();
+
         if ($driver == 'mysql' && version_compare(PHP_VERSION, '5.3.6', '<=')
             && isset($cred['charset'])) {
           $options[PDO::MYSQL_ATTR_INIT_COMMAND] = 'SET NAMES ' . $cred['charset'];
         }
+
         $options = do_hook( 'pdo_options', $options, $cred, $driver );
+
         $databases[$hash] = new Database( $dsn, $username, $password, $options );
         $databases[$hash]->prefix = $prefix;
         return $databases[$hash];
@@ -163,6 +168,7 @@ function db($db_id = '') {
       catch ( PDOException $e ) {
         show_error('System error', 'Can\'t connect to database. <br >' . $e->getMessage());
       }
+
     }
   }
 
@@ -203,30 +209,39 @@ function ip() {
 }
 
 /**
- * TI's class autoloader function.
+ * ti-framework class autoloader function.
  *
  * @fire __autoload
  *
- * @param string $Library
+ * @param string $library
+ *
+ * @return bool
  */
-function ti_autoloader($Library = '') {
+function ti_autoloader($library = '') {
 
-  if ( is_readable( TI_PATH_FRAMEWORK . '/class.' . $Library . '.php' )) {
-    include_once TI_PATH_FRAMEWORK . '/class.' . $Library . '.php';
-  }
-  elseif ( is_readable( TI_PATH_APP . '/' . TI_FOLDER_MODEL . '/' . $Library . TI_EXT_MODEL )) {
-    include_once TI_PATH_APP . '/' . TI_FOLDER_MODEL . '/' . $Library . TI_EXT_MODEL;
-  }
-  elseif ( is_readable( TI_PATH_APP . '/' . TI_FOLDER_MODEL . '/class.' . $Library . TI_EXT_MODEL )) {
-    include_once TI_PATH_APP . '/' . TI_FOLDER_MODEL . '/class.' . $Library . TI_EXT_MODEL;
+  $library = strtolower( $library );
+
+  $possible_files = array(
+    TI_PATH_FRAMEWORK . '/class-' . $library . '.php',
+    TI_PATH_APP . '/' . TI_FOLDER_INC . '/class-' . $library . TI_EXT_INC,
+    TI_PATH_APP . '/' . TI_FOLDER_INC . '/class.' . $library . TI_EXT_INC,
+    TI_PATH_APP . '/' . TI_FOLDER_INC . '/' . $library . TI_EXT_INC,
+  );
+
+  $possible_files = do_hook( '__autoload', $possible_files, $library );
+
+  foreach ( $possible_files as $file ) {
+    if ( is_readable( $file ) ) {
+      include_once( $file );
+      return TRUE;
+    }
   }
 
-  do_hook( '__autoload', $Library );
-
-  if ( !class_exists( $Library ) ) {
-    show_error( 'System error', 'Library <strong>' . $Library . '</strong> not exists.' );
+  if ( !class_exists( $library ) ) {
+    show_error( 'System error', 'Library <strong>' . $library . '</strong> not exists.' );
     return FALSE;
   }
+
 }
 
 /**
@@ -253,7 +268,7 @@ function is_mobile() {
   if ( stripos( $user_agent, 'tablet' ) !== FALSE ) {
     $is_mobile = FALSE;
   }
-  elseif ( preg_match( '#(ipod|android|symbian|blackbarry|gsm|phone|mobile|mini)#', $user_agent ) ) {
+  elseif ( preg_match( '#(ipod|android|symbian|blackbarry|gsm|phone|mobile|opera mini)#', $user_agent ) ) {
     $is_mobile = TRUE;
   }
   elseif ( strpos( $accept, 'text/vnd.wap.wml' ) > 0 || strpos( $accept, 'application/vnd.wap.xhtml+xml') > 0  ) {
@@ -317,9 +332,11 @@ function site_url($url = '') {
     $url = implode( '/', $url );
   }
 
-  $url = TI_PATH_WEB .
+  $url = preg_replace( '#\/{2,}#', '/', $url );
+
+  $url = trailingslashit( TI_PATH_WEB ) .
          ( TI_DISABLE_MOD_REWRITE ? '?' : '' ) .
-         preg_replace( '#\/{2,}#', '/', trim( $url, '/' ) . '/' );
+         trim( $url, '/' ) . '/';
 
   return do_hook( 'site_url', $url );
 }
@@ -342,7 +359,48 @@ function current_url() {
  * @return string
  */
 function base_url() {
-  return TI_PATH_WEB;
+  return trailingslashit( TI_PATH_WEB );
+}
+
+/**
+ * Appends a trailing slash.
+ *
+ * Will remove trailing slash if it exists already before adding a trailing
+ * slash. This prevents double slashing a string or path.
+ *
+ * The primary use of this is for paths and thus should be used for paths. It is
+ * not restricted to paths and offers no specific path support.
+ *
+ * @thanks WordPress team
+ *
+ * @uses untrailingslashit() Unslashes string if it was slashed already.
+ *
+ * @param string $string
+ *   What to add the trailing slash to.
+ *
+ * @return string
+ *   String with trailing slash added.
+ */
+function trailingslashit($string) {
+  return untrailingslashit($string) . '/';
+}
+
+/**
+ * Removes trailing slash if it exists.
+ *
+ * The primary use of this is for paths and thus should be used for paths. It is
+ * not restricted to paths and offers no specific path support.
+ *
+ * @thanks WordPress team
+ *
+ * @param string $string
+ *   What to remove the trailing slash from.
+ *
+ * @return string
+ *   String without the trailing slash.
+ */
+function untrailingslashit($string) {
+  return rtrim($string, '/');
 }
 
 /**
@@ -435,7 +493,7 @@ function po_to_array($file = '') {
           $last_msgid .= NL . trim( $line, '" ' );
         }
         else {
-          $array[$last_msgid] .= NL . trim($line, '" ');
+          $array[$last_msgid] .= NL . trim( $line, '" ' );
         }
       }
     }
@@ -474,25 +532,25 @@ function po_to_array($file = '') {
  * msgid "string"
  * msgstr "String"
  *
- * @param string $Locale
+ * @param string $locale
  *   locale name
  *
  * @return bool
  */
-function load_locale($Locale = '') {
+function load_locale($locale = '') {
 
   global $_LOCALE;
 
-  if ( is_readable( TI_PATH_APP . TI_FOLDER_LOCALE . '/' . $Locale . '.php') ) {
-    $_lang = include( TI_PATH_APP . TI_FOLDER_LOCALE . '/' . $Locale . '.php' );
+  if ( is_readable( TI_PATH_APP . '/' . TI_FOLDER_LOCALE . '/' . $locale . '.php') ) {
+    $_lang = include( TI_PATH_APP . '/' . TI_FOLDER_LOCALE . '/' . $locale . '.php' );
   }
 
-  elseif ( is_readable( TI_PATH_APP . TI_FOLDER_LOCALE . '/' . $Locale . '.po') ) {
-    $_lang = po_to_array( TI_PATH_APP . TI_FOLDER_LOCALE . '/' . $Locale . '.po' );
+  elseif ( is_readable( TI_PATH_APP . '/' . TI_FOLDER_LOCALE . '/' . $locale . '.po') ) {
+    $_lang = po_to_array( TI_PATH_APP . '/' . TI_FOLDER_LOCALE . '/' . $locale . '.po' );
   }
 
   else {
-    show_error('System error', 'Locale <strong>' . $Locale . '</strong> not exists.');
+    show_error('System error', 'Locale <strong>' . $locale . '</strong> not exists.');
     return FALSE;
   }
 
@@ -599,7 +657,7 @@ function set_document_html() {
  * @return bool
  */
 function set_document_nocache() {
-  if (headers_sent()) {
+  if ( headers_sent() ) {
     return FALSE;
   }
   header( 'Expires: Wed, 11 Jan 1984 05:00:00 GMT', TRUE );
@@ -671,6 +729,7 @@ function set_document_downloadable($filename = '', $size = 0) {
  * @param string $message
  * @param string $callback
  *   callback that check user password
+ *   can be function name or closure
  *   it should accept two parameters and return bool
  *
  * @return bool
@@ -796,8 +855,8 @@ function between($value = 0, $min = 0, $max = 0) {
   return $min <= $value && $value <= $max ? TRUE : FALSE;
 }
 
-// Backward competability for PHP < 5.6.
-if ( !function_exists('ifsetor') ) {
+// Backward competability for ifsetor in PHP < 5.6.
+if ( !function_exists('ifsetor') ):
   /**
    * Return variable value, if variable not exists, then create it
    * This function is backward competability from php 5.6
@@ -813,7 +872,7 @@ if ( !function_exists('ifsetor') ) {
     }
     return $var;
   }
-}
+endif;
 
 if ( !function_exists( 'ifdefor' ) ) {
   /**
@@ -1326,17 +1385,17 @@ function find_file($directory = '.', $pattern = '', $skip_hidden = TRUE) {
 
   $list = array();
 
-  if ( !($dir = opendir($directory)) ) {
+  if ( !($dir = opendir( $directory )) ) {
     return $list;
   }
 
-  while ( FALSE !== ($file = readdir($dir)) ) {
+  while ( FALSE !== ($file = readdir( $dir)) ) {
 
     if ($skip_hidden && $file{0} == '.') {
       continue;
     }
 
-    if ( is_dir($directory . '/' . $file) ) {
+    if ( is_dir( $directory . '/' . $file ) ) {
       $list += find_file( $directory . '/' . $file, $pattern, $skip_hidden );
     }
     elseif ( preg_match($pattern, $directory . '/' . $file ) ) {
@@ -1532,7 +1591,7 @@ function http_query($url, $type = 'GET', $data = NULL, &$header = '', $timeout =
 
     $headers = array(
         'Content-type' => 'application/x-www-form-urlencoded',
-        'User-Agent' => 'Mozilla/5.0 (compatible; MSIE 7.0; Windows 7)',
+        'User-Agent' => 'Mozilla/4.0 (compatible; MSIE 8.0; Windows NT 6.0)',
     );
 
     if ($query['query']) {
@@ -1600,7 +1659,7 @@ function make_hash($string = '') {
     return '';
   }
 
-  return md5( TI_APP_SECRET . str_rot13(CAST_TO_STRING($string)) );
+  return md5( TI_APP_SECRET . str_rot13( CAST_TO_STRING($string) ) );
 }
 
 /**
@@ -2052,8 +2111,7 @@ function esc_attr($string = '') {
  * @param mixed $default
  * @param bool $return
  *
- * @return selected
- *   or echo if $return is set to FALSE
+ * @return NULL|string
  */
 function selected($current = '', $default = 1, $return = TRUE) {
   if ( CAST_TO_STRING($current) === CAST_TO_STRING($default) ) {
@@ -2073,8 +2131,7 @@ function selected($current = '', $default = 1, $return = TRUE) {
  * @param mixed $default
  * @param bool $return
  *
- * @return selected
- *   or echo if $return is set to FALSE
+ * @return NULL|string
  */
 function checked($current = '', $default = 1, $return = TRUE) {
   if ( CAST_TO_STRING($current) === CAST_TO_STRING($default) ) {
@@ -2248,7 +2305,8 @@ function evalute_math( $string = '', &$sanitized_string = '' ) {
   $string = 'return ' . $string . ';';
 
   // Evalute the sanitized math expression.
-  $x = @eval( $string );
+  $fx = create_function( '$string', 'return ' . $string . ';' );
+  $x = $fx( $string );
 
   if ( is_numeric($x) ) {
     return (double) $x;
@@ -2352,6 +2410,8 @@ function is_word_set($string = '', $min = 0, $max = NULL) {
 /**
  * Check if string is valid email.
  *
+ * @fire is_email
+ *
  * @param string $string
  * @param int $min
  *   minimum values
@@ -2362,7 +2422,8 @@ function is_word_set($string = '', $min = 0, $max = NULL) {
  */
 function is_email($string = '') {
   $pattern = '^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.(?:[A-Z]{2}|com|org|net|edu|gov|mil|biz|info|mobi|name|aero|asia|jobs|museum)$i';
-  return preg_match($pattern, CAST_TO_STRING($string)) ? TRUE : FALSE;
+  $result = preg_match( $pattern, CAST_TO_STRING($string) ) ? TRUE : FALSE;
+  return do_hook( 'is_email', $result, $string );
 }
 
 /**
@@ -2453,9 +2514,11 @@ function human_time_diff( $from, $to = '' ) {
  * Simple alternator implementation.
  *
  * <?php
- *   echo alternator('one', 'two', 'tree'); // one
- *   echo alternator('one', 'two', 'tree'); // two
- *   echo alternator('one', 'two', 'tree'); // tree
+ *   echo alternator( 'one', 'two', 'three' ); // one
+ *   echo alternator( 'one', 'two', 'three' ); // two
+ *   echo alternator( 'one', 'two', 'three' ); // three
+ *   echo alternator( 'one', 'two', 'three' ); // one
+ *   echo alternator( 'one', 'two', 'three' ); // two
  * ?>
  *
  * @param mixed $arg1

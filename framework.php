@@ -39,12 +39,13 @@ define( 'TI_TIMER_START', microtime( TRUE ) );
 
 // Check for PHP version.
 if ( version_compare(PHP_VERSION, '5.2.0', '<') ) {
-  die( 'REQUIRE PHP >= 5.2' );
+  die( 'REQUIRE PHP >= 5.2.0' );
 }
 
 // Set path framework.
-define( 'TI_PATH_FRAMEWORK', dirname(__FILE__) );
+define( 'TI_PATH_FRAMEWORK', pathinfo( __FILE__, PATHINFO_DIRNAME ) );
 
+// Set disabled mod rewrite.
 defined( 'TI_DISABLE_MOD_REWRITE' ) or define( 'TI_DISABLE_MOD_REWRITE',  FALSE );
 
 // Correct the requested URL
@@ -136,11 +137,13 @@ define( 'TI_IS_CLI', ( php_sapi_name() == 'cli' || empty($_SERVER['REMOTE_ADDR']
 if ( !defined('TI_PATH_APP') ) {
   if ( TI_IS_CLI ) {
     $i = get_included_files();
-    define( 'TI_PATH_APP', dirname( array_shift($i) ) . '/application/' );
-    unset( $i );
+    if ( !empty($i[0]) ) {
+      define( 'TI_PATH_APP', pathinfo( $i[0], PATHINFO_DIRNAME ) . '/application' );
+      unset( $i );
+    }
   }
   else {
-    define( 'TI_PATH_APP', dirname( $_SERVER['SCRIPT_FILENAME'] )  . '/application/' );
+    define( 'TI_PATH_APP', pathinfo( $_SERVER['SCRIPT_FILENAME'], PATHINFO_DIRNAME )  . '/application' );
   }
 
   if ( !TI_PATH_APP ) {
@@ -149,7 +152,8 @@ if ( !defined('TI_PATH_APP') ) {
 }
 
 // Detect the webpath.
-defined( 'TI_PATH_WEB' ) or define( 'TI_PATH_WEB', pathinfo( $_SERVER['SCRIPT_NAME'], PATHINFO_DIRNAME ) );
+defined( 'TI_PATH_WEB' )
+  or define( 'TI_PATH_WEB', rtrim( pathinfo( $_SERVER['SCRIPT_NAME'], PATHINFO_DIRNAME ), '/' ) . '/' );
 
 // Internationalization.
 defined( 'TI_LOCALE' )              or define( 'TI_LOCALE', 'en_US' );
@@ -157,10 +161,10 @@ defined( 'TI_FOLDER_LOCALE' )       or define( 'TI_FOLDER_LOCALE', 'locale' );
 defined( 'TI_TIMEZONE' )            or define( 'TI_TIMEZONE', 'GMT' );
 
 // Set MVC folders, if they are not set already by the config file.
-defined( 'TI_FOLDER_MODEL' )        or define( 'TI_FOLDER_MODEL', 'class' );
+defined( 'TI_FOLDER_INC' )          or define( 'TI_FOLDER_INC', 'includes' );
 defined( 'TI_FOLDER_VIEW' )         or define( 'TI_FOLDER_VIEW', 'html' );
 defined( 'TI_FOLDER_CONTROLLER' )   or define( 'TI_FOLDER_CONTROLLER', 'www' );
-defined( 'TI_EXT_MODEL' )           or define( 'TI_EXT_MODEL', '.php' );
+defined( 'TI_EXT_INC' )             or define( 'TI_EXT_INC', '.php' );
 defined( 'TI_EXT_VIEW' )            or define( 'TI_EXT_VIEW', '.html' );
 defined( 'TI_EXT_CONTROLLER' )      or define( 'TI_EXT_CONTROLLER', '.php' );
 defined( 'TI_AUTORENDER' )          or define( 'TI_AUTORENDER', TRUE );
@@ -212,12 +216,6 @@ require TI_PATH_FRAMEWORK . '/functions.php';
 // Determine if the request is ajax or not.
 define( 'TI_IS_AJAX', ( strtolower( ifsetor( $_SERVER['HTTP_X_REQUESTED_WITH'] ) ) == 'xmlhttprequest') );
 
-// Here, because using some functions from the framework.
-if ( defined('TI_DOCUMENTATION') && is_string( TI_DOCUMENTATION ) && $_SERVER['REQUEST_URI'] === '/' . TI_DOCUMENTATION ) {
-  include TI_PATH_FRAMEWORK . '/documentation.php';
-  exit;
-}
-
 // Instantinate session.
 if ( !session_id() ) {
   session_start();
@@ -244,6 +242,12 @@ unset( $_REQUEST, $_ENV, $HTTP_RAW_POST_DATA, $GLOBALS, $http_response_header, $
 
 // Register autoloader function.
 spl_autoload_register( 'ti_autoloader' );
+
+// Show documentation or continue with the app.
+if ( defined('TI_DOCUMENTATION') && is_string( TI_DOCUMENTATION ) && $_SERVER['REQUEST_URI'] === '/' . TI_DOCUMENTATION ) {
+  include TI_PATH_FRAMEWORK . '/documentation.php';
+  exit;
+}
 
 // Prevent outputing from the __application.
 if ( !ob_list_handlers() ) {

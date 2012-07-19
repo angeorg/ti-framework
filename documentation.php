@@ -42,9 +42,8 @@
       $hooks[] = $hook[1];
     }
   }
+
   //sort($functions);
-
-
 
 ?>
 <!doctype html>
@@ -52,11 +51,12 @@
     <head>
         <title> ti-framework v<?php echo TI_FW_VERSION?> </title>
         <style>
-            * { margin: 0; padding: 0; }
+            * { margin: 0; padding: 0; -webkit-transition: all 0.3s ease-in-out; transition: all 0.3s ease-in-out; }
             body { background: #eee; color: #111; font: normal 12px sans-serif; }
             a { color: #3b748c; }
-            .navigation { float: left; width: 200px; margin: 8px; padding: 8px; background: #fff; border: 1px solid #ccc; box-shadow: 0 0 12px #bbb; }
-            .main { margin: 8px 8px 8px 240px; }
+            .navigation { overflow: auto; width: 20%; height: 100%; position: fixed; }
+            .menu { padding: 10px; }
+            .main { overflow: auto; margin-left: 20%; height: 100%; position: fixed; left: 0; right: 0; }
             .navigation h3 { font-size: 18px; }
             .navigation li { list-style: none; }
             .navigation li a { text-decoration: none; padding: 2px 5px; display: block; }
@@ -69,6 +69,10 @@
             .v-param { color: #2397c9; font-weight: bolder; }
             .v-return { color: #f00; font-weight: bolder; }
             .helpblock .code { background: #ddd; display: block; overflow: auto; font-family: monospace; font-size: 11px; }
+            ::-webkit-scrollbar { padding: 5px; width: 6px; height: 6px; }
+            ::-webkit-scrollbar-track { background-color: rgba(0, 0, 0, 0.1); }
+            ::-webkit-scrollbar-thumb { background-color: rgba(0, 0, 0, 0.5); border-radius: 4px; }
+            ::-webkit-scrollbar-thumb:hover { background-color: rgba(0, 0, 0, 0.7); }
         </style>
         <script src="http://code.jquery.com/jquery-1.7.2.min.js"></script>
         <script>
@@ -85,26 +89,28 @@
     </head>
     <body>
         <div class="navigation">
-            <h3>Generic</h3>
-            <ul>
-                <li>
-                    <a  href="#base">Base</a>
-                </li>
-            </ul>
-            <h3>Classes</h3>
-            <ul>
-                <li>
-                    <a href="#class-Appliction">Application</a>
-                </li>
-            </ul>
-            <h3>Functions</h3>
-            <ul>
-            <?php foreach ( $functions as $function ):?>
-                <li>
-                    <a href="#function-<?php echo $function?>"><?php echo $function?></a>
-                </li>
-            <?php endforeach ?>
-            </ul>
+              <div class="menu">
+                  <h3>Generic</h3>
+                  <ul>
+                      <li>
+                          <a  href="#base">Base</a>
+                      </li>
+                  </ul>
+                  <h3>Classes</h3>
+                  <ul>
+                      <li>
+                          <a href="#class-Appliction">Application</a>
+                      </li>
+                  </ul>
+                  <h3>Functions</h3>
+                  <ul>
+                  <?php foreach ( $functions as $function ):?>
+                      <li>
+                          <a href="#function-<?php echo $function?>"><?php echo $function?></a>
+                      </li>
+                  <?php endforeach ?>
+                  </ul>
+              </div>
         </div>
         <div class="main">
 
