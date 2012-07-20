@@ -757,10 +757,14 @@ function document_auth($callback = '', $message = '') {
   }
 
   $success = FALSE;
-
   if ( is_callable( $callback ) && !empty( $_SERVER['PHP_AUTH_USER'] ) && !empty( $_SERVER['PHP_AUTH_PW'] )) {
+
+    // The callback exists, also user data are sent.
     $success = $callback(
-        string_sanitize( CAST_TO_STRING( $_SERVER['PHP_AUTH_USER'] ) ), string_sanitize( CAST_TO_STRING( $_SERVER['PHP_AUTH_PW'] ) ) );
+        string_sanitize( CAST_TO_STRING( $_SERVER['PHP_AUTH_USER'] ) ),
+        string_sanitize( CAST_TO_STRING( $_SERVER['PHP_AUTH_PW'] ) ) );
+
+    // Unset the PHP_AUT_USER and PHP_AUTH_PW.
     unset( $_SERVER['PHP_AUTH_USER'], $_SERVER['PHP_AUTH_PW'] );
   }
 
@@ -1556,19 +1560,19 @@ function send_mail($to = '', $subject = '(No subject)', $message = '', $header =
 
 /**
  * Perform a http request.
+ * It is using libCURL if it's available or fallback to php's fsockopen() if not.
  *
  * @fire http_query_headers
  *
  * @param string $url
- * @param string $type
+ * @param string $method
  * @param mixed $data
- * @param array $header
  * @param string $timeout
  *
  * @return bool|string
  *   FALSE if error ocure, or string if all is okay and content is obtained.
  */
-function http_query($url, $type = 'GET', $data = NULL, &$header = '', $timeout = 30) {
+function http_query($url, $method = 'GET', $data = NULL, $timeout = 30) {
 
   $default = array(
       'scheme' => 'http',
@@ -1583,63 +1587,70 @@ function http_query($url, $type = 'GET', $data = NULL, &$header = '', $timeout =
 
   $query = array_model( $default, parse_url($url) );
 
-  if ( $query['query'] || $data ) {
-    parse_str($query['query'], $data2);
-    if ( is_scalar( $data ) ) {
-      parse_str( $data, $data );
-    }
-  }
-  else {
-    $data = CAST_TO_ARRAY( $data );
-    $query['query'] = array_merge( $data2, $data );
-    unset($data, $data2);
-    $query['query'] = http_build_query( $query['query'], NULL, '&' );
-  }
-
-  if (!in_array($type, array('GET', 'POST', 'OPTIONS'))) {
+  $method = strtoupper( $method );
+  if (!in_array($method, array('GET', 'POST', 'OPTIONS'))) {
     return FALSE;
   }
 
-  $fp = fsockopen($query['host'], $query['port'], $errno, $errstr, $timeout);
-  if (!$fp) {
-    return FALSE;
+  $data = CAST_TO_ARRAY( $data );
+
+  if ( $method === 'GET' ) {
+    parse_str( $query['query'], $query_data );
+    $query['query'] = http_build_query( array_merge( $query_data, $query['query'] ), NULL, '&' );
+    unset( $query_data );
   }
+
+  // Set headers.
+  $headers = array(
+      'Content-type' => 'application/x-www-form-urlencoded',
+      'User-Agent' => 'Mozilla/4.0 (compatible; MSIE 8.0; Windows NT 6.0)',
+  );
+  if ($query['query']) {
+    $headers['Content-length'] = strlen( $query['query'] );
+  }
+  $headers = do_hook( 'http_query_headers', $headers, $query );
+
+  // Prefere curl before fsockopen.
+  if ( function_exists( 'curl_init' )) {
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+    curl_setopt($ch, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_0);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+    if ( $method === 'POST' ) {
+      curl_setopt( $ch, CURLOPT_POST, 1 );
+      curl_setopt( $ch, CURLOPT_POSTFIELDS, $data );
+    }
+    curl_setopt($ch, CURLOPT_TIMEOUT, $timeout);
+    $response = (string) curl_exec($ch);
+    curl_close($ch);
+    return $response;
+  }
+  // Fallback to fsockopen
   else {
-
-    fputs( $fp, $type . ' ' . $query['path'] . ' HTTP/1.1' . "\r\n" );
-    fputs( $fp, 'Host: ' . $query['host'] . "\r\n" );
-
-    $headers = array(
-        'Content-type' => 'application/x-www-form-urlencoded',
-        'User-Agent' => 'Mozilla/4.0 (compatible; MSIE 8.0; Windows NT 6.0)',
-    );
-
-    if ($query['query']) {
-      $headers['Content-length'] = strlen( $query['query'] );
+    $fp = @fsockopen( $query['host'], $query['port'], $errno, $errstr, $timeout );
+    if ( !$fp ) {
+      error_log( 'ti-framework: http_query:fsockopen[' . $errno . '] ' . $errstr );
+      return FALSE;
     }
-
-    $headers = do_hook( 'http_query_headers', $headers, $query );
-
-    foreach ($headers as $key => $val) {
-      fputs( $fp, $key . ': ' . $val . "\r\n" );
+    else {
+      fputs( $fp, $method . ' ' . $query['path'] . ' HTTP/1.1' . "\r\n" );
+      fputs( $fp, 'Host: ' . $query['host'] . "\r\n" );
+      foreach ($headers as $key => $val) {
+        fputs( $fp, $key . ': ' . $val . "\r\n" );
+      }
+      fputs( $fp, 'Connection: close' . "\r\n\r\n" );
+      if ( $query['query'] ) {
+        fputs( $fp, $query['query'] . "\r\n\r\n" );
+      }
+      $result = '';
+      while ( !feof($fp) ) {
+        $result .= fgets( $fp, 4096 );
+      }
+      fclose($fp);
+      $result = explode( "\r\n\r\n", $result, 2 );
+      return (string) array_pop();
     }
-
-    fputs( $fp, 'Connection: close' . "\r\n\r\n" );
-    if ( $query['query'] ) {
-      fputs( $fp, $query['query'] . "\r\n\r\n" );
-    }
-
-    $result = '';
-    while ( !feof($fp) ) {
-      $result .= fgets( $fp, 4096 );
-    }
-
-    fclose($fp);
-
-    $result = explode( "\r\n\r\n", $result, 2 );
-    $header = array_shift($result);
-
-    return CAST_TO_STRING( array_shift( $result ) );
   }
 }
 
@@ -1721,9 +1732,9 @@ function fileupload_get_size_limit() {
   }
 
   $x = array(
-      (int) ini_get( 'upload_max_filesize' ),
-      (int) ini_get( 'post_max_size' ),
-      (int) ini_get( 'memory_limit' ),
+    (int) ini_get( 'upload_max_filesize' ),
+    (int) ini_get( 'post_max_size' ),
+    (int) ini_get( 'memory_limit' ),
   );
 
   $x = array_filter($x);
@@ -1744,12 +1755,15 @@ function sys_get_temp_dir() {
   if (($temp = getenv('TMP')) !== FALSE) {
     return $temp;
   }
-  elseif (($temp = getenv('TEMP')) !== FALSE)
-  return $temp;
-  elseif (($temp = getenv('TMPDIR')) !== FALSE)
-  return $temp;
-  elseif (($temp = ini_get('upload_tmp_dir')) !== NULL)
-  return $temp;
+  elseif (($temp = getenv('TEMP')) !== FALSE) {
+    return $temp;
+  }
+  elseif (($temp = getenv('TMPDIR')) !== FALSE) {
+    return $temp;
+  }
+  elseif (($temp = ini_get('upload_tmp_dir')) !== NULL) {
+    return $temp;
+  }
   else {
     return TI_PATH_APP . '/tmp';
   }
@@ -1769,6 +1783,7 @@ if ( !function_exists('parse_ini_string') ):
  * @return array
  */
 function parse_ini_string($string, $process_sections = FALSE) {
+
   $lines = explode(NL, CAST_TO_STRING($string));
   $return = array();
   $in_sect = FALSE;
@@ -1994,7 +2009,7 @@ function do_hook($hook_name, $value = NULL) {
 
   foreach ( $_HOOKS[$hook_name] as $hook_priority ) {
     foreach ( $hook_priority as $hook ) {
-      if ( is_callable ($hook) ) {
+      if ( is_callable($hook) ) {
         $value = call_user_func_array($hook, $args);
       }
     }
