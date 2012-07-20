@@ -130,22 +130,9 @@ defined( 'TI_APP_SECRET' ) or define( 'TI_APP_SECRET', 'ti-framework' );
 // Set the debugging mode to false.
 defined( 'TI_DEBUG_MODE') or define( 'TI_DEBUG_MODE', FALSE );
 
-// Determine if app is running from a console or not.
-define( 'TI_IS_CLI', ( php_sapi_name() == 'cli' || empty($_SERVER['REMOTE_ADDR']) ) );
-
 // Detect application path.
 if ( !defined('TI_PATH_APP') ) {
-  if ( TI_IS_CLI ) {
-    $i = get_included_files();
-    if ( !empty($i[0]) ) {
-      define( 'TI_PATH_APP', pathinfo( $i[0], PATHINFO_DIRNAME ) . '/application' );
-      unset( $i );
-    }
-  }
-  else {
-    define( 'TI_PATH_APP', pathinfo( $_SERVER['SCRIPT_FILENAME'], PATHINFO_DIRNAME )  . '/application' );
-  }
-
+  define( 'TI_PATH_APP', pathinfo( realpath( $_SERVER['SCRIPT_FILENAME'] ), PATHINFO_DIRNAME )  . '/application' );
   if ( !TI_PATH_APP ) {
     die( 'Application path not defined.' );
   }
@@ -208,20 +195,28 @@ ini_set( 'magic_quotes_sybase', '0' );
 // Include core functions.
 require TI_PATH_FRAMEWORK . '/functions.php';
 
+// If is not cli and the REMOTE_ADDR is empty, then something is wrong.
+if ( !is_cli() && empty( $_SERVER['REMOTE_ADDR'] ) ) {
+  error_log( 'ti-framework: Request from unknown user.' );
+  die( 'Permission denied' );
+}
+
 // Determine if the request is ajax or not.
 define( 'TI_IS_AJAX', ( strtolower( ifsetor( $_SERVER['HTTP_X_REQUESTED_WITH'] ) ) == 'xmlhttprequest') );
 
-// Instantinate session.
-if ( !session_id() ) {
-  session_start();
-}
-if ( ifsetor( $_SESSION['_ti_client'] ) !== md5( TI_IP . $_SERVER['HTTP_USER_AGENT'] )
-    || ifsetor( $_SESSION['_ti_id'] ) !== md5( TI_APP_SECRET . session_id() ) ) {
+if ( !ifdefor( TI_DISABLE_SESSIONS, FALSE ) ) {
+  // Instantinate session.
+  if ( !session_id() ) {
+    session_start();
+  }
+  if ( ifsetor( $_SESSION['_ti_client'] ) !== md5( TI_IP . $_SERVER['HTTP_USER_AGENT'] )
+      || ifsetor( $_SESSION['_ti_id'] ) !== md5( TI_APP_SECRET . session_id() ) ) {
 
-  $_SESSION['_ti_client'] = md5( TI_IP . $_SERVER['HTTP_USER_AGENT'] );
-  $_SESSION['_ti_id'] = md5( TI_APP_SECRET . session_id() );
+    $_SESSION['_ti_client'] = md5( TI_IP . $_SERVER['HTTP_USER_AGENT'] );
+    $_SESSION['_ti_id'] = md5( TI_APP_SECRET . session_id() );
+  }
+  session_regenerate_id();
 }
-session_regenerate_id();
 
 // Set default timezone.
 date_default_timezone_set( TI_TIMEZONE );

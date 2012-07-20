@@ -41,6 +41,9 @@
       $hooks[] = $hook[1];
     }
   }
+
+  $ti_framework_icon = 'data:image/png;base64,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%3D';
+
 ?>
 <!doctype html>
 <html>
@@ -54,6 +57,10 @@
             ::-webkit-scrollbar-thumb:hover { background-color: rgba(0, 0, 0, 0.7); }
             body { background: #eee; color: #111; font: normal 12px sans-serif; }
             a { color: #3b748c; }
+            .ti-framework-icon {
+              width:55px; height:55px;
+              background-image:url(<?php echo $ti_framework_icon?>);
+            }
             .navigation { overflow: auto; width: 20%; height: 100%; position: fixed; }
             .menu { padding: 10px; }
             .main { overflow: auto; margin-left: 20%; height: 100%; position: fixed; left: 0; right: 0; }
@@ -74,11 +81,23 @@
     <body>
         <div class="navigation">
               <div class="menu">
+                  <div class="ti-framework-icon"></div>
                   <h3>Generic</h3>
                   <ul>
                       <li>
                           <a  href="#base">Base</a>
                       </li>
+                  </ul>
+                  <h3>Hooks</h3>
+                  <ul>
+                  <?php foreach ($hooks as $hook):?>
+
+                      <li>
+                        <a href="#hook-<?php echo $hook?>">
+                          <?php echo $hook?>
+                        </a>
+                      </li>
+                  <?php endforeach?>
                   </ul>
                   <h3>Classes</h3>
                   <ul>
@@ -134,7 +153,7 @@ highlight_string($htaccess); unset($htaccess);?>
   // Set default home url.
   //define( 'TI_HOME',                 'index' );
 
-  // Set the debugging mode to false.
+  // Enable/Disable debugging, or -1 to enable only logging errors
   //define( 'TI_DEBUG_MODE',           FALSE );
 
   // Web url to application (must ending with slash)
@@ -144,17 +163,20 @@ highlight_string($htaccess); unset($htaccess);?>
   // Disable mod_rewrite support.
   //define( 'TI_DISABLE_MOD_REWRITE',  FALSE );
 
+  // Disable sessions in the application
+  // define( 'TI_DISABLE_SESSIONS', FALSE );
+
   // i18n settings.
   //define( 'TI_LOCALE',               'en_US' );
   //define( 'TI_FOLDER_LOCALE',        'locale' );
   //define( 'TI_TIMEZONE',             'GMT' );
 
-  // Set MVC folders
+  // Set MVC alike folders
   //define( 'TI_FOLDER_INC',           'includes' );
   //define( 'TI_FOLDER_VIEW',          'html' );
   //define( 'TI_FOLDER_CONTROLLER',    'www' );
 
-  // Set MVC file extensions
+  // Set MVC alike file extensions
   //define( 'TI_EXT_INC',              '.php' );
   //define( 'TI_EXT_VIEW',             '.html' );
   //define( 'TI_EXT_CONTROLLER',       '.php' );
@@ -163,7 +185,7 @@ highlight_string($htaccess); unset($htaccess);?>
   //define( 'TI_AUTORENDER',           TRUE );
 
   // Cache controller rules for faster routing.
-  //define( 'TI_RULES_CACHE',          FALSE );
+  define( 'TI_RULES_CACHE',          120 );
 
   // Default directory where ti-framework stores the cache
   //define( 'TI_FOLDER_CACHE',         'cache' );

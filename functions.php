@@ -185,7 +185,7 @@ endif;
  * @return bool
  */
 function is_cli() {
-  return TI_IS_CLI;
+  return PHP_SAPI == 'cli';
 }
 
 /**
@@ -195,15 +195,10 @@ function is_cli() {
  *   True if SSL, false if not used.
  */
 function is_ssl() {
-  if ( !empty($_SERVER['HTTPS']) ) {
-    if ( strtolower($_SERVER['HTTPS']) == 'on' ) {
-      return TRUE;
-    }
-    if ( $_SERVER['HTTPS'] == '1' ) {
-      return TRUE;
-    }
+  if ( !empty( $_SERVER['HTTPS'] ) && ( strtolower( $_SERVER['HTTPS'] ) == 'on' || $_SERVER['HTTPS'] == '1' ) ) {
+    return TRUE;
   }
-  elseif ( isset($_SERVER['SERVER_PORT']) && ( $_SERVER['SERVER_PORT'] == '443' ) ) {
+  elseif ( !empty( $_SERVER['SERVER_PORT'] ) && ( $_SERVER['SERVER_PORT'] == '443' ) ) {
     return TRUE;
   }
   return FALSE;
@@ -403,7 +398,7 @@ function base_url() {
  *   String with trailing slash added.
  */
 function trailingslashit($string) {
-  return untrailingslashit($string) . '/';
+  return untrailingslashit( $string ) . '/';
 }
 
 /**
@@ -421,7 +416,7 @@ function trailingslashit($string) {
  *   String without the trailing slash.
  */
 function untrailingslashit($string) {
-  return rtrim($string, '/');
+  return rtrim( $string, '/' );
 }
 
 /**
@@ -698,13 +693,13 @@ function set_document_nocache() {
  */
 function set_document_downloadable($filename = '', $size = 0) {
 
-  if (headers_sent()) {
+  if ( headers_sent() ) {
     return FALSE;
   }
 
   $filename = sanitize_string( CAST_TO_STRING( $filename ) );
 
-  if ( is_readable($filename) ) {
+  if ( is_readable( $filename ) ) {
     $size = filesize( $filename );
     $filename = basename( $filename );
   }
@@ -712,7 +707,7 @@ function set_document_downloadable($filename = '', $size = 0) {
     if (!$size) {
       $size = 0;
     }
-    $filename = basename(current_url());
+    $filename = basename( current_url() );
   }
 
   if ( $size ) {
@@ -747,24 +742,23 @@ function set_document_downloadable($filename = '', $size = 0) {
  *   });
  * ?>
  *
- * @param string $message
  * @param string $callback
  *   callback that check user password
  *   can be function name or closure
  *   it should accept two parameters and return bool
+ * @param string $message
  *
  * @return bool
  */
-function document_auth($message = '', $callback = '') {
+function document_auth($callback = '', $message = '') {
 
-  if (headers_sent()) {
-    show_error('System', 'Can\'t ask for password.');
-    exit;
+  if ( headers_sent() ) {
+    $callback = create_function( '', 'return FALSE;' );
   }
 
   $success = FALSE;
 
-  if (is_callable( $callback ) && !empty( $_SERVER['PHP_AUTH_USER'] ) && !empty( $_SERVER['PHP_AUTH_PW'] )) {
+  if ( is_callable( $callback ) && !empty( $_SERVER['PHP_AUTH_USER'] ) && !empty( $_SERVER['PHP_AUTH_PW'] )) {
     $success = $callback(
         string_sanitize( CAST_TO_STRING( $_SERVER['PHP_AUTH_USER'] ) ), string_sanitize( CAST_TO_STRING( $_SERVER['PHP_AUTH_PW'] ) ) );
     unset( $_SERVER['PHP_AUTH_USER'], $_SERVER['PHP_AUTH_PW'] );
@@ -830,7 +824,7 @@ function show_error($title = 'Error', $message = 'An error occurred.', $errno = 
   }
   else {
     echo
-    '<!doctype html><html><head><title>' . htmlspecialchars($title) . '</title></head>',
+    '<!doctype html><html><head><title>' . htmlspecialchars( $title ). '</title></head>',
     '<body><h1>' . $title . '</h1><div>' . $message . '</div></body></html>';
     exit;
   }

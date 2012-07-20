@@ -87,13 +87,11 @@ function _ti_application_routes() {
       $routes = explode( NL, cache_get( 'ti://rules-cache', TI_RULES_CACHE ) );
     }
     else {
-
       $routes = _ti_application_find_routes_fd( TI_PATH_APP . '/' . TI_FOLDER_CONTROLLER );
       asort( $routes );
       if ( TI_RULES_CACHE ) {
         cache_put( 'ti://rules-cache', implode( NL, $routes ) );
       }
-
     }
   }
 
@@ -107,6 +105,7 @@ class Application {
 
   static private $is_main = TRUE;
   static private $variables = array();
+
   private $arguments = array();
 
   /**
@@ -196,7 +195,7 @@ class Application {
         return TRUE;
       }
     }
-    if (self::$is_main) {
+    if ( self::$is_main ) {
       show_404();
     }
     else {

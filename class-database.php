@@ -56,7 +56,7 @@ class Database extends PDO {
    * @return string
    */
   public function db_table($tablename = '') {
-    return $this->db_squote( $this->prefix . $tablename );
+    return $this->db_column( $this->prefix . $tablename );
   }
 
   /**
@@ -68,13 +68,13 @@ class Database extends PDO {
    *
    * @return string
    */
-  public function db_squote($key = '') {
-    if ( $key ) {
+  public function db_column($column_name = '') {
+    if ( $column_name ) {
       switch ( $this->getDriver() ) {
         case 'interbase': $sq = '"'; break;
         case 'mysql': default: $sq = '`';
       }
-      return $sq . $key . $sq;
+      return $sq . $column_name . $sq;
     }
     return '';
   }
@@ -110,7 +110,7 @@ class Database extends PDO {
     $query->setFetchMode( PDO::FETCH_OBJ) ;
     $query->execute( $args );
 
-    if ( TI_DEBUG_MODE && (int) $query->error Code() ) {
+    if ( TI_DEBUG_MODE && (int) $query->errorCode() ) {
       show_error( 'Database error', vsprintf('<p><strong>%s</strong> %s</p><p>%s</p>', $query->errorInfo() ) );
     }
 
@@ -143,14 +143,14 @@ class Database extends PDO {
     }
 
     foreach ($elements as $key => $val) {
-      if ($prepend_clause !== 'SET' && is_array($val)) {
-        $q[] = $this->db_squote($key) . ' IN ( ' . str_repeat('?', count($val)) . ')';
-        foreach ($val as $v) {
+      if ($prepend_clause !== 'SET' && is_array($val) ) {
+        $q[] = $this->db_column( $key ) . ' IN ( ' . str_repeat( '?', count($val) ) . ')';
+        foreach ( $val as $v ) {
           $args[] = $v;
         }
       }
       else {
-        $q[] = $this->db_squote($key) . ' = ? ';
+        $q[] = $this->db_column( $key ) . ' = ? ';
         $args[] = $val;
       }
     }
@@ -180,19 +180,19 @@ class Database extends PDO {
 
     $elements = CAST_TO_ARRAY( $elements );
 
-    $querystr = 'INSERT INTO ' . $this->db_squote($table);
+    $querystr = 'INSERT INTO ' . $this->db_column($table);
 
     $keys = array();
-    foreach ( array_keys($elements) as $key ) {
-      $keys[] = $this->db_squote($Key);
+    foreach ( array_keys( $elements ) as $key ) {
+      $keys[] = $this->db_column( $key );
     }
 
     $querystr.= '(' . implode(',', $keys). ')';
-    $querystr.= 'VALUES(' . implode(',', array_fill(0, count($elements), '?')). ')';
+    $querystr.= 'VALUES(' . implode( ',', array_fill( 0, count( $elements ), '?' ) ). ')';
 
-    $query = $this->prepare($querystr);
+    $query = $this->prepare( $querystr );
 
-    return $query-execute(array_values($elements));
+    return $query->execute( array_values( $elements ) );
   }
 
   /**
@@ -209,16 +209,16 @@ class Database extends PDO {
    */
   function delete($table = '', $condition = array()) {
 
-    if (is_string($condition)) {
+    if ( is_string( $condition ) ) {
       $cond_str = $condition;
     }
     else {
-      $cond_str = $this->build_keypair_clause($condition, $args, 'WHERE', 'AND');
+      $cond_str = $this->build_keypair_clause( $condition, $args, 'WHERE', 'AND' );
     }
 
-    $querystr = 'DELETE FROM ' . $this->db_squote($table) . $cond_str;
+    $querystr = 'DELETE FROM ' . $this->db_column( $table ) . $cond_str;
 
-    $this->query($querystr, $args);
+    $this->query( $querystr, $args );
 
     return $this->affected_rows();
   }
@@ -250,7 +250,7 @@ class Database extends PDO {
       }
 
       $querystr = 'UPDATE ' .
-          $this->db_squote($table) .
+          $this->db_column($table) .
           $set_str .
           $this->build_keypair_clause($condition, $args, 'WHERE', 'AND');
       $this->query($querystr, $args);
@@ -283,7 +283,7 @@ class Database extends PDO {
     else {
         $columns = CAST_TO_ARRAY( $columns );
         foreach ( $columns as &$col ) {
-            $col = $this->db_squote( $col );
+            $col = $this->db_column( $col );
         }
         $querystr .= ' ' . implode( ', ', $columns );
     }
