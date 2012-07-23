@@ -1,7 +1,7 @@
 <?php
 
 /**
- * framework.php - the framework code
+ * ti-framework.php - the framework code
  *
  * Copyright (c) 2010, e01 <dimitrov.adrian@gmail.com>
  * All rights reserved.
@@ -31,11 +31,13 @@
  * USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+// For bootstrap instructions @see group "framework bootstrap".
+
 /**
- * @defgroup generic functions
+ * @defgroup generic classes
  * @{
  *
- * declare framework's classes
+ * Define classes Application, Messagebus, Database, Calendar, Image, Pagination
  */
 
 /**
@@ -1473,11 +1475,13 @@ class Pagination {
  * @defgroup generic functions
  * @{
  *
- * declare framework's functions
+ * declare framework's generic functions
  */
 
 /**
  * Fix $_SERVER SERVER_SOFTWARE and REQUEST_URI variables for future using.
+ *
+ * @thanks WordPress
  *
  * @return void
  */
@@ -1805,6 +1809,8 @@ if (!function_exists('get_ip')):
 /**
  * Get the IP of visitor
  *
+ * @fire get_ip
+ *
  * @return string
  */
 function get_ip() {
@@ -1818,7 +1824,7 @@ function get_ip() {
             ifsetor($_SERVER['REMOTE_ADDR']) ),
         '000.000.000.000' );
   }
-  return $ip;
+  return do_hook( 'get_ip', $ip );
 }
 endif;
 
@@ -4814,10 +4820,10 @@ if ( is_readable( TI_PATH_APP . '/' . TI_AUTOLOAD_FILE ) ) {
 // Let boot the app.
 $Application = new Application( $_SERVER['REQUEST_URI'] );
 
-/**
- * @} End of "defgroup framework bootstrap".
- */
-
 // Fire the shutdown hook.
 // @fire shutdown
 do_hook( 'shutdown' );
+
+/**
+ * @} End of "defgroup framework bootstrap".
+ */
