@@ -1,7 +1,7 @@
 <?php
 
 /**
- * framework.php - Main ti-framework initialization instructions
+ * framework.php - the framework code
  *
  * Copyright (c) 2010, e01 <dimitrov.adrian@gmail.com>
  * All rights reserved.
@@ -29,162 +29,6 @@
  * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
  * USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */
-
-/**
- * @defgroup framework bootstrap
- * @{
- *
- * Booting the ti-framework
- */
-
-// Set the framework version.
-define( 'TI_FW_VERSION', '0.9.9.0' );
-
-// Start the timer.
-define( 'TI_TIMER_START', microtime( TRUE ) );
-
-// Check for PHP version.
-if ( version_compare( PHP_VERSION, '5.2.0', '<' ) ) {
-  die( 'REQUIRE PHP >= 5.2.0' );
-}
-
-// Define NL (new line) constant.
-defined( 'NL' ) or define('NL', "\n");
-
-// Set path framework.
-define( 'TI_PATH_FRAMEWORK', pathinfo( __FILE__, PATHINFO_DIRNAME ) );
-
-// Set disabled mod rewrite.
-defined( 'TI_DISABLE_MOD_REWRITE' ) or define( 'TI_DISABLE_MOD_REWRITE',  FALSE );
-
-// Set default home url.
-defined( 'TI_HOME' ) or define( 'TI_HOME', 'index' );
-
-// Set appsecret salt.
-defined( 'TI_APP_SECRET' ) or define( 'TI_APP_SECRET', 'ti-framework' );
-
-// Set the debugging mode to false.
-defined( 'TI_DEBUG_MODE') or define( 'TI_DEBUG_MODE', FALSE );
-
-// Detect application path.
-if ( !defined( 'TI_PATH_APP' ) ) {
-  define( 'TI_PATH_APP', pathinfo( realpath( $_SERVER['SCRIPT_FILENAME'] ), PATHINFO_DIRNAME )  . '/application' );
-  if ( !TI_PATH_APP ) {
-    die( 'Application path not defined.' );
-  }
-}
-
-// Detect the webpath.
-defined( 'TI_PATH_WEB' ) or define( 'TI_PATH_WEB', rtrim( pathinfo( $_SERVER['SCRIPT_NAME'], PATHINFO_DIRNAME ), '/' ) . '/' );
-
-// Internationalization.
-defined( 'TI_LOCALE' )              or define( 'TI_LOCALE', 'en_US' );
-defined( 'TI_FOLDER_LOCALE' )       or define( 'TI_FOLDER_LOCALE', 'locale' );
-defined( 'TI_TIMEZONE' )            or define( 'TI_TIMEZONE', 'GMT' );
-
-// Set MVC alike folders, if they are not set already by the config file.
-defined( 'TI_FOLDER_INC' )          or define( 'TI_FOLDER_INC', 'includes' );
-defined( 'TI_FOLDER_VIEW' )         or define( 'TI_FOLDER_VIEW', 'html' );
-defined( 'TI_FOLDER_CONTROLLER' )   or define( 'TI_FOLDER_CONTROLLER', 'www' );
-defined( 'TI_EXT_INC' )             or define( 'TI_EXT_INC', '.php' );
-defined( 'TI_EXT_VIEW' )            or define( 'TI_EXT_VIEW', '.html' );
-defined( 'TI_EXT_CONTROLLER' )      or define( 'TI_EXT_CONTROLLER', '.php' );
-define(  'TI_EXT_CONTROLLER_N',     strlen( TI_EXT_CONTROLLER ) * -1 );
-
-defined( 'TI_AUTORENDER' )          or define( 'TI_AUTORENDER', TRUE );
-defined( 'TI_RULES_CACHE' )         or define( 'TI_RULES_CACHE', FALSE );
-defined( 'TI_FOLDER_CACHE' )        or define( 'TI_FOLDER_CACHE', 'cache' );
-
-// Correct the ip.
-define( 'TI_IP', array_match_first(
-  'is_ip', array(
-    ifsetor($_SERVER['HTTP_CLIENT_IP']),
-    ifsetor($_SERVER['HTTP_X_FORWARDED_FOR']),
-    ifsetor($_SERVER['REMOTE_ADDR']) ),
-  '000.000.000.000' ) );
-
-// Fix server vars for $_SERVER['REQUEST_URI'].
-_ti_fix_server_vars();
-
-// Set debugging mode.
-if ( TI_DEBUG_MODE ) {
-  error_reporting( E_ALL );
-  ini_set( 'display_errors', 1 );
-  ini_set( 'display_startup_errors', TRUE );
-}
-else {
-  error_reporting( 0 );
-  ini_set( 'display_errors', 'stderr' );
-  ini_set( 'display_startup_errors', FALSE );
-}
-
-// Reset some of PHP's configurations.
-ini_set( 'mbstring.internal_encoding', 'UTF-8' );
-ini_set( 'mbstring.func_overload', '7' );
-ini_set( 'allow_url_fopen', '0' );
-ini_set( 'register_globals', '0' );
-ini_set( 'arg_separator.output', '&amp;' );
-ini_set( 'url_rewriter.tags', '' );
-ini_set( 'magic_quotes_gpc', '0' );
-ini_set( 'magic_quotes_runtime', '0' );
-ini_set( 'magic_quotes_sybase', '0' );
-
-// Determine if the request is ajax or not.
-define( 'TI_IS_AJAX', ( strtolower( ifsetor( $_SERVER['HTTP_X_REQUESTED_WITH'] ) ) == 'xmlhttprequest') );
-
-if ( !ifdefor( 'TI_DISABLE_SESSION', FALSE ) ) {
-  _ti_session_start();
-}
-
-// Set default timezone.
-date_default_timezone_set( TI_TIMEZONE );
-
-// Set main locale.
-setlocale( LC_CTYPE, TI_LOCALE );
-
-// Set ti error handler.
-set_error_handler( 'ti_error_handler' );
-
-// Unregister globals.
-unset( $_REQUEST, $_ENV, $HTTP_RAW_POST_DATA, $GLOBALS, $http_response_header, $argc, $argv );
-
-// If is not cli and the REMOTE_ADDR is empty, then something is wrong.
-if ( !is_cli() && empty( $_SERVER['REMOTE_ADDR'] ) ) {
-  error_log( 'ti-framework: Request from unknown user.' );
-  die( 'Permission denied' );
-}
-
-// Exit if favicon request detected.
-if ( '/favicon.ico' == $_SERVER['REQUEST_URI'] ) {
-  header( 'Content-Type: image/vnd.microsoft.icon' );
-  header( 'Content-Length: 0' );
-  exit;
-}
-
-// Show documentation or continue with the app.
-if ( defined('TI_DOCUMENTATION') && is_string( TI_DOCUMENTATION ) && $_SERVER['REQUEST_URI'] === '/' . TI_DOCUMENTATION ) {
-  include TI_PATH_FRAMEWORK . '/documentation.php';
-  exit;
-}
-
-// Register autoloader function.
-spl_autoload_register( 'ti_autoloader' );
-
-// Fire the shutdown hook.
-// @fire shutdown
-register_shutdown_function( 'do_hook', 'shutdown' );
-
-// Check for __application.php
-if ( is_readable( TI_PATH_APP . '/__application.php' ) ) {
-  include TI_PATH_APP . '/__application.php';
-}
-
-// Let boot the app.
-$Application = new Application( $_SERVER['REQUEST_URI'] );
-
-/**
- * @} End of "defgroup framework bootstrap".
  */
 
 /**
@@ -1718,10 +1562,10 @@ function _ti_session_start() {
   if ( !session_id() ) {
     session_start();
   }
-  if ( ifsetor( $_SESSION['_ti_client'] ) !== md5( TI_IP . $_SERVER['HTTP_USER_AGENT'] )
+  if ( ifsetor( $_SESSION['_ti_client'] ) !== md5( get_ip() . $_SERVER['HTTP_USER_AGENT'] )
       || ifsetor( $_SESSION['_ti_id'] ) !== md5( TI_APP_SECRET . session_id() ) ) {
 
-    $_SESSION['_ti_client'] = md5( TI_IP . $_SERVER['HTTP_USER_AGENT'] );
+    $_SESSION['_ti_client'] = md5( get_ip() . $_SERVER['HTTP_USER_AGENT'] );
     $_SESSION['_ti_id'] = md5( TI_APP_SECRET . session_id() );
   }
   session_regenerate_id();
@@ -1957,14 +1801,26 @@ function is_ajax() {
   return do_hook( 'is_ajax', TI_IS_AJAX );
 }
 
+if (!function_exists('get_ip')):
 /**
  * Get the IP of visitor
  *
  * @return string
  */
-function ip() {
-  return TI_IP;
+function get_ip() {
+  static $ip = NULL;
+  if ( $ip === NULL ) {
+    // Correct the ip.
+    $ip = array_match_first(
+        'is_ip', array(
+            ifsetor($_SERVER['HTTP_CLIENT_IP']),
+            ifsetor($_SERVER['HTTP_X_FORWARDED_FOR']),
+            ifsetor($_SERVER['REMOTE_ADDR']) ),
+        '000.000.000.000' );
+  }
+  return $ip;
 }
+endif;
 
 /**
  * ti-framework class autoloader function.
@@ -4813,3 +4669,155 @@ function transliterate($string = '', $from_latin = FALSE) {
 /**
  * @} End of "defgroup generic functions".
  */
+
+
+/**
+ * @defgroup framework bootstrap
+ * @{
+ *
+ * Booting the ti-framework, after all functions and classes are defined.
+ */
+
+// Set the framework version.
+define( 'TI_FW_VERSION', '0.9.9.0' );
+
+// Start the timer.
+define( 'TI_TIMER_START', microtime( TRUE ) );
+
+// Check for PHP version.
+if ( version_compare( PHP_VERSION, '5.2.0', '<' ) ) {
+  die( 'REQUIRE PHP >= 5.2.0' );
+}
+
+// Define NL (new line) constant.
+defined( 'NL' ) or define('NL', "\n");
+
+// Set path framework.
+define( 'TI_PATH_FRAMEWORK', pathinfo( __FILE__, PATHINFO_DIRNAME ) );
+
+// Set disabled mod rewrite.
+defined( 'TI_DISABLE_MOD_REWRITE' ) or define( 'TI_DISABLE_MOD_REWRITE',  FALSE );
+
+// Set default home url.
+defined( 'TI_HOME' ) or define( 'TI_HOME', 'index' );
+
+// Set appsecret salt.
+defined( 'TI_APP_SECRET' ) or define( 'TI_APP_SECRET', 'ti-framework' );
+
+// Set the debugging mode to false.
+defined( 'TI_DEBUG_MODE') or define( 'TI_DEBUG_MODE', FALSE );
+
+// Detect application path.
+if ( !defined( 'TI_PATH_APP' ) ) {
+  define( 'TI_PATH_APP', pathinfo( realpath( $_SERVER['SCRIPT_FILENAME'] ), PATHINFO_DIRNAME )  . '/application' );
+  if ( !TI_PATH_APP ) {
+    die( 'Application path not defined.' );
+  }
+}
+
+// Detect the webpath.
+defined( 'TI_PATH_WEB' ) or define( 'TI_PATH_WEB', trailingslashit( pathinfo( $_SERVER['SCRIPT_NAME'], PATHINFO_DIRNAME ) ) );
+
+// Internationalization.
+defined( 'TI_LOCALE' )              or define( 'TI_LOCALE', 'en_US' );
+defined( 'TI_FOLDER_LOCALE' )       or define( 'TI_FOLDER_LOCALE', 'locale' );
+defined( 'TI_TIMEZONE' )            or define( 'TI_TIMEZONE', 'GMT' );
+
+// Set MVC alike folders, if they are not set already by the config file.
+defined( 'TI_FOLDER_INC' )          or define( 'TI_FOLDER_INC', 'includes' );
+defined( 'TI_FOLDER_VIEW' )         or define( 'TI_FOLDER_VIEW', 'html' );
+defined( 'TI_FOLDER_CONTROLLER' )   or define( 'TI_FOLDER_CONTROLLER', 'www' );
+defined( 'TI_EXT_INC' )             or define( 'TI_EXT_INC', '.php' );
+defined( 'TI_EXT_VIEW' )            or define( 'TI_EXT_VIEW', '.html' );
+defined( 'TI_EXT_CONTROLLER' )      or define( 'TI_EXT_CONTROLLER', '.php' );
+define(  'TI_EXT_CONTROLLER_N',     strlen( TI_EXT_CONTROLLER ) * -1 );
+
+defined( 'TI_AUTOLOAD_FILE' )       or define( 'TI_AUTOLOAD_FILE', '__application.php' );
+defined( 'TI_AUTORENDER' )          or define( 'TI_AUTORENDER', TRUE );
+defined( 'TI_RULES_CACHE' )         or define( 'TI_RULES_CACHE', FALSE );
+defined( 'TI_FOLDER_CACHE' )        or define( 'TI_FOLDER_CACHE', 'cache' );
+
+// Fix server vars for $_SERVER['REQUEST_URI'].
+_ti_fix_server_vars();
+
+// Set debugging mode.
+if ( TI_DEBUG_MODE ) {
+  error_reporting( E_ALL );
+  ini_set( 'display_errors', 1 );
+  ini_set( 'display_startup_errors', TRUE );
+}
+else {
+  error_reporting( 0 );
+  ini_set( 'display_errors', 'stderr' );
+  ini_set( 'display_startup_errors', FALSE );
+}
+
+// Reset some of PHP's configurations.
+ini_set( 'mbstring.internal_encoding', 'UTF-8' );
+ini_set( 'mbstring.func_overload', '7' );
+ini_set( 'allow_url_fopen', '0' );
+ini_set( 'register_globals', '0' );
+ini_set( 'arg_separator.output', '&amp;' );
+ini_set( 'url_rewriter.tags', '' );
+ini_set( 'magic_quotes_gpc', '0' );
+ini_set( 'magic_quotes_runtime', '0' );
+ini_set( 'magic_quotes_sybase', '0' );
+
+// Determine if the request is ajax or not.
+define( 'TI_IS_AJAX', ( strtolower( ifsetor( $_SERVER['HTTP_X_REQUESTED_WITH'] ) == 'xmlhttprequest') ) );
+
+// Start sesion.
+defined( 'TI_DISABLE_SESSION' ) or define( 'TI_DISABLE_SESSION', FALSE );
+if ( !TI_DISABLE_SESSION ) {
+  _ti_session_start();
+}
+
+// Set default timezone.
+date_default_timezone_set( TI_TIMEZONE );
+
+// Set main locale.
+setlocale( LC_CTYPE, TI_LOCALE );
+
+// Set ti error handler.
+set_error_handler( 'ti_error_handler' );
+
+// Unregister globals.
+unset( $_REQUEST, $_ENV, $HTTP_RAW_POST_DATA, $GLOBALS, $http_response_header, $argc, $argv );
+
+// If is not cli and the REMOTE_ADDR is empty, then something is wrong.
+if ( !is_cli() && empty( $_SERVER['REMOTE_ADDR'] ) ) {
+  error_log( 'ti-framework: Request from unknown user.' );
+  die( 'Permission denied' );
+}
+
+// Exit if favicon request detected.
+if ( '/favicon.ico' == $_SERVER['REQUEST_URI'] ) {
+  header( 'Content-Type: image/vnd.microsoft.icon' );
+  header( 'Content-Length: 0' );
+  exit;
+}
+
+// Show documentation or continue with the app.
+if ( defined('TI_DOCUMENTATION') && is_string( TI_DOCUMENTATION ) && $_SERVER['REQUEST_URI'] === '/' . TI_DOCUMENTATION ) {
+  include TI_PATH_FRAMEWORK . '/documentation.php';
+  exit;
+}
+
+// Register autoloader function.
+spl_autoload_register( 'ti_autoloader' );
+
+// Check for __application.php
+if ( is_readable( TI_PATH_APP . '/' . TI_AUTOLOAD_FILE ) ) {
+  include TI_PATH_APP . '/' . TI_AUTOLOAD_FILE;
+}
+
+// Let boot the app.
+$Application = new Application( $_SERVER['REQUEST_URI'] );
+
+/**
+ * @} End of "defgroup framework bootstrap".
+ */
+
+// Fire the shutdown hook.
+// @fire shutdown
+do_hook( 'shutdown' );
