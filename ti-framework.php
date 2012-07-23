@@ -1549,6 +1549,10 @@ function _ti_fix_server_vars() {
     }
   }
 
+  // Sanitize $_SERVER['REQUEST_URI']
+  $_SERVER['REQUEST_URI'] = string_sanitize( $_SERVER['REQUEST_URI'] );
+  $_SERVER['REQUEST_URI'] = strtr( $_SERVER['REQUEST_URI'], array( '../' => '', './' => '' ) );
+
   // Set TI_HOME if we are on root.
   if ( $_SERVER['REQUEST_URI'] == '/' ) {
     $_SERVER['REQUEST_URI'] = TI_HOME;
@@ -1638,14 +1642,14 @@ function _ti_application_routes() {
 
 /**
  * Load URL when define new object of Application with parameters.
-*
-* @see Application->load().
-*
-* @param string $url
-* @param string $return
-*
-* @return Application
-*/
+ *
+ * @see Application->load().
+ *
+ * @param string $url
+ * @param string $return
+ *
+ * @return Application
+ */
 function Application($url = '', $return = FALSE) {
   $app = new Application( $url, $return );
   return $app;
@@ -1808,11 +1812,11 @@ function is_ajax() {
 if (!function_exists('get_ip')):
 /**
  * Get the IP of visitor
- *
- * @fire get_ip
- *
- * @return string
- */
+*
+* @fire get_ip
+*
+* @return string
+*/
 function get_ip() {
   static $ip = NULL;
   if ( $ip === NULL ) {
@@ -2456,10 +2460,6 @@ function ti_error_handler($errno, $errstr, $errfile, $errline) {
     return TRUE;
   }
 
-  elseif ( TI_DEBUG_MODE === -1 ) {
-    error_log('TI# URL: ' . URL . '[' . $errline . '][' . $errfile . '] ' . $errstr);
-    return TRUE;
-  }
   else
     echo
     '<div style="border:1px dotted red;" class="ti_error_handler">',
@@ -4751,11 +4751,13 @@ if ( TI_DEBUG_MODE ) {
   error_reporting( E_ALL );
   ini_set( 'display_errors', 1 );
   ini_set( 'display_startup_errors', TRUE );
+  ini_set( 'log_errors', TRUE );
 }
 else {
   error_reporting( 0 );
-  ini_set( 'display_errors', 'stderr' );
+  ini_set( 'display_errors', FALSE );
   ini_set( 'display_startup_errors', FALSE );
+  ini_set( 'log_errors', TRUE );
 }
 
 // Reset some of PHP's configurations.
