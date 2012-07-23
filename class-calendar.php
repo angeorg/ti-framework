@@ -41,33 +41,48 @@ class Calendar {
 
   /**
    * Link template (spritnf suitable string)
-   * @var string
+   *
+   * @var $link_template
+   *
+   * @access public
    */
   public $link_template = 'blog/%Y-%m-%d';
 
   /**
    * Link all days, instead of these with events only
-   * @var bool
+   *
+   * @var $link_all_days
+   *
+   * @access public
    */
   public $link_all_days = TRUE;
 
   /**
    * First day of week is monday.
-   * @var bool
+   *
+   * @var $first_is_monday
+   *
+   * @access public
    */
   public $first_is_monday = TRUE;
 
   /**
    * Show weekdays names, instead of numbers.
-   * @var bool
+   *
+   * @var $show_weekday_names
+   *
+   * @access public
    */
   public $show_weekday_names = TRUE;
 
   /**
-   * Show weekdays
-   * @var bool
+   * Markup to wrap the table (printf suitable string)
+   *
+   * @access public
+   *
+   * @var $html_table_open
    */
-  public $show_table_headers = TRUE;
+  public $html_table_wrap = '<table class="table-calendar">%s</table>';
 
   private $events_dates = array();
   private $html = '';
@@ -132,23 +147,19 @@ class Calendar {
       $YMD[2] = date('d');
     }
 
-    $Y = str_pad(CAST_TO_INT($YMD[0]), 4, 0, STR_PAD_LEFT);
-    $M = str_pad(CAST_TO_INT($YMD[1], 1, 12), 2, 0, STR_PAD_LEFT);
-    $D = str_pad(CAST_TO_INT($YMD[2], 1, 31), 2, 0, STR_PAD_LEFT);
+    $Y = str_pad( CAST_TO_INT( $YMD[0] ), 4, 0, STR_PAD_LEFT );
+    $M = str_pad( CAST_TO_INT( $YMD[1], 1, 12 ), 2, 0, STR_PAD_LEFT );
+    $D = str_pad( CAST_TO_INT( $YMD[2], 1, 31 ), 2, 0, STR_PAD_LEFT );
 
-    $day_weekday = date('w', mktime(0, 0, 0, $M, 1, $Y));
-    if ($day_weekday === 0) {
+    $day_weekday = date( 'w', mktime( 0, 0, 0, $M, 1, $Y ) );
+    if ( $day_weekday === 0 ) {
       $day_weekday = 7;
-    }
-
-    if ($this->show_table_headers) {
-      $this->html .= '<table class="table">';
     }
 
     $this->html .= '<tr>';
 
-    if ($this->show_weekday_names) {
-      for ($i = 0; $i < 7; $i++) {
+    if ( $this->show_weekday_names) {
+      for ( $i = 0; $i < 7; $i++ ) {
         $this->html .= '<th>' . $i . '</th>';
       }
       $this->html .= '</tr><tr>';
@@ -209,8 +220,8 @@ class Calendar {
 
     $this->html .= '</tr>';
 
-    if ($this->show_table_headers) {
-      $this->html .= '</table>';
+    if ( strpos( $this->html_table_wrap, '%s' ) !== FALSE ) {
+      $this->html = sprintf( $this->html_table_wrap, $this->html );
     }
 
     return $this;

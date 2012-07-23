@@ -393,9 +393,9 @@ function sql_is_time_interval( $string = '' ) {
  */
 function sql_get_enum_values($columntype = '') {
 
-  $type = CAST_TO_STRING($type);
+  $columntype = CAST_TO_STRING($columntype);
 
-  if ( preg_match('/^set\((.*)\)/i', $type, $matches) || preg_match('/^enum\((.*)\)/i', $type, $matches) ) {
+  if ( preg_match('/^set\((.*)\)/i', $columntype, $matches) || preg_match('/^enum\((.*)\)/i', $columntype, $matches) ) {
     if ( count($matches) > 0 ) {
       $matches = explode( ',', array_pop( $matches ) );
       foreach($matches as $key => $val) {

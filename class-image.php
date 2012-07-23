@@ -54,7 +54,7 @@ class Image {
    */
   function load_from_file($filename = '') {
 
-    if ( !$file || !is_readable($filename) ) {
+    if ( !$filename || !is_readable($filename) ) {
       return FALSE;
     }
 
@@ -323,11 +323,10 @@ class Image {
     $height_orig = imagesy( $this->im );
     $ratio_orig = $width_orig / $height_orig;
 
-    if ($preserve_smaller) {
+    if ( $preserve_smaller ) {
       $width_orig = imagesx( $this->im );
       $height_orig = imagesy( $this->im );
       if ( $width_orig < $width && $height_orig < $height ) {
-        $this->im = $image;
         return TRUE;
       }
     }
@@ -406,7 +405,7 @@ class Image {
 
     $fontsize = CAST_TO_INT( $fontsize, 1, 120 );
 
-    $black = imagecolorallocate( $image, 0, 0, 0 );
+    $black = imagecolorallocate( $this->im, 0, 0, 0 );
 
     list( $pos[0], $post[1] ) = explode( ' ', $position );
 
@@ -414,14 +413,14 @@ class Image {
       $mark_x = 10;
     }
     else {
-      $mark_x = imagesx( $image ) - 10 - strlen( $text ) * $fontsize;
+      $mark_x = imagesx( $this->im ) - 10 - strlen( $text ) * $fontsize;
     }
 
     if ( strpos($position, 'TOP') !== FALSE) {
       $mark_y = 10;
     }
     else {
-      $mark_y = imagesy($image) - 10 - $fontsize;
+      $mark_y = imagesy( $this->im ) - 10 - $fontsize;
     }
 
     return (bool) imagettftext( $this->im, $fontsize, 0, $mark_x, $mark_y, $black, $font, $text );
@@ -439,10 +438,14 @@ class Image {
    *
    * @return bool
    */
-  function wattermark_image($image, $size = 0, $position = 'RIGHT BOTTOM') {
+  function wattermark_image($imagefile, $size = 0, $position = 'RIGHT BOTTOM') {
+
+    if ( !$imagefile ) {
+      return FALSE;
+    }
 
     $wim = new Image;
-    if (!$wim->load_from_file($filename)) {
+    if (!$wim->load_from_file( $imagefile )) {
       return FALSE;
     }
 

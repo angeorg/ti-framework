@@ -116,6 +116,7 @@ class Application {
    * @access public
    *
    * @param string $url
+   * @param bool $return
    *
    * @return Application
    */
@@ -146,7 +147,7 @@ class Application {
     $url = do_hook( 'application_load_url', $url );
 
     // Protect private controllers.
-    if (self::$is_main && preg_match('#\/(\_|\.)#', $url) ) {
+    if (self::$is_main && preg_match( '#\/(\_|\.)#', $url ) ) {
       show_404();
     }
 
@@ -163,21 +164,23 @@ class Application {
 
     $rules = _ti_application_routes();
 
-    foreach ($rules as $rule) {
-      if (!$rule) {
+    foreach ( $rules as $rule ) {
+      if ( !$rule ) {
         continue;
       }
       $pattern = strtr( preg_quote( $rule ), array('%s' => '([^\/]+)', '%d' => '([0-9]+)')) . '(?:\/(.*))?';
-      if ( preg_match( '#^' . $pattern . '$#i', $url, $this->arguments ) || preg_match( '#^' . $pattern . '$#i', $url . '/index', $this->arguments ) ) {
+      if ( preg_match( '#^' . $pattern . '$#i', $url, $this->arguments )
+        || preg_match( '#^' . $pattern . '$#i', $url . '/index', $this->arguments ) ) {
 
-        if ( strpos( end( $this->arguments ), '/' ) !== FALSE ) {
-          $ends = array_pop( $this->arguments );
-          $ends = explode( '/', $ends );
-          $this->arguments = array_merge( $this->arguments, $ends );
-          unset( $ends );
-        }
+        unset( $this->arguments[0] );
+        $this->arguments = explode( '/', implode( '/', $this->arguments ) );
+        // Is it correct to strip duplicated / (slashes), maybe sometimes they are placed correctly?!
+        // $this->arguments = array_filter( $this->arguments );
+
         self::$is_main = FALSE;
         unset( $rules, $url, $pattern );
+
+        // Checking for controller or controller directory (index.php alike)
         if ( is_readable( TI_PATH_APP . '/' . TI_FOLDER_CONTROLLER . $rule . TI_EXT_CONTROLLER ) ) {
           include( TI_PATH_APP . '/' . TI_FOLDER_CONTROLLER . $rule . TI_EXT_CONTROLLER );
         }
@@ -199,7 +202,7 @@ class Application {
       show_404();
     }
     else {
-      show_error('Controller error', 'The controller <strong>' . $url . '</strong> not exists.');
+      show_error( 'Controller error', 'The controller <strong>' . $url . '</strong> not exists.' );
     }
   }
 
@@ -217,7 +220,7 @@ class Application {
     if ( func_num_args() > 0 ) {
       if ( is_readable( TI_PATH_APP . '/' . TI_FOLDER_VIEW  . '/' . func_get_arg(0) . TI_EXT_VIEW ) ) {
         extract( self::$variables, EXTR_REFS );
-        return include( TI_PATH_APP . '/' . TI_FOLDER_VIEW  . '/' . func_get_arg(0) . TI_EXT_VIEW );
+        include( TI_PATH_APP . '/' . TI_FOLDER_VIEW  . '/' . func_get_arg(0) . TI_EXT_VIEW );
       }
       if ( !TI_AUTORENDER ) {
         show_error('Template error', 'The template <strong>' . func_get_arg(0) . '</strong> not exists.');
@@ -233,7 +236,7 @@ class Application {
    * @return string|NULL
    */
   public function arg($n = 0) {
-    return isset( $this->args[$n] ) ? $this->args[$n] : NULL;
+    return isset( $this->arguments[$n] ) ? $this->arguments[$n] : NULL;
   }
 
   /**
@@ -274,7 +277,8 @@ class Application {
     if ( isset( self::$variables[$key] ) ) {
       return self::$data[$key];
     }
-    return NULL;
+    $val = NULL;
+    return $val;
   }
 
 }

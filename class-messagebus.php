@@ -37,7 +37,18 @@
 class Messagebus {
 
   /**
+   * Allowed HTML tags to be used in message body.
+   *
+   * @var $allowed_html_tags
+   *
+   * @access public
+   */
+  public $allowed_html_tags = '<p><div><em><u><b><strong><i><img><a>';
+
+  /**
    * Add message to the messagebu's queue.
+   *
+   * @access public
    *
    * @param string $Text
    * @param string $Title
@@ -46,13 +57,13 @@ class Messagebus {
    *
    * @return boolean
    */
-  function add($Text = '', $Title = '', $Class = '', $Attributes = array()) {
+  public function add($Text = '', $Title = '', $Class = '', $Attributes = array()) {
 
     $Attributes = CAST_TO_OBJECT( $Attributes );
 
     $o = new stdClass;
     $o->Title = strip_tags( CAST_TO_STRING($Title) );
-    $o->Text = strip_tags( CAST_TO_STRING( $Text ), '<p><div><em><u><b><strong><i><img><a>' );
+    $o->Text = strip_tags( CAST_TO_STRING( $Text ), $this->allowed_html_tags );
     $o->Class = htmlentities( CAST_TO_STRING($Class) );
     $o->Attributes = $Attributes;
 
@@ -68,25 +79,31 @@ class Messagebus {
   /**
    * Get all messages in the queue.
    *
+   * @access public
+   *
    * @return array
    */
-  function get_all() {
+  public function get_all() {
     return (array) session_get( '_ti_mbus' );
   }
 
   /**
    * Get number of messages in the queue.
    *
+   * @access public
+   *
    * @return int
    */
-  function count() {
+  public function count() {
     return count( session_get( '_ti_mbus' ) );
   }
 
   /**
    * Clear messages in the queue.
+   *
+   * @access public
    */
-  function clear() {
+  public function clear() {
     session_set( '_ti_mbus', array() );
   }
 

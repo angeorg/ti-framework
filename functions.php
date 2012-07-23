@@ -48,7 +48,7 @@ if ( defined('TI_PATH_FRAMEWORK') ):
  * @return Application
  */
 function Application($url = '', $return = FALSE) {
-  $app = new Application( $url, $reutrn );
+  $app = new Application( $url, $return );
   return $app;
 }
 
@@ -1176,7 +1176,7 @@ function array_model($array = array(), $model = array(), $strict_mode = TRUE) {
     }
   }
   else {
-    $the_array = array_merge( $the_array, $array );
+    $the_array = array_merge( $model, $array );
   }
 
   return $the_array;
@@ -1341,7 +1341,7 @@ function explode_n($delimeter = ',', $string = '', $elements_number = 1, $defaul
   $array = explode( $delimeter, $string, ( $elements_number ? $elements_number : NULL ));
 
   if ( !$array ) {
-    return array_fill( 0, $elements_number, $default_value_for_nulls );
+    return array_fill( 0, $elements_number, $default_value );
   }
   elseif ( count( $array ) === $elements_number ) {
     return $array;
@@ -1542,7 +1542,7 @@ function send_mail($to = '', $subject = '(No subject)', $message = '', $header =
       'X-Mailer' => 'PHP-' . phpversion(),
   ), $header );
 
-  $headers = do_hook( 'send_mail_headers', $headers );
+  $header = do_hook( 'send_mail_headers', $header );
 
   $header_ = '';
   foreach ($header as $key => $val) {
@@ -1649,7 +1649,7 @@ function http_query($url, $method = 'GET', $data = NULL, $timeout = 30) {
       }
       fclose($fp);
       $result = explode( "\r\n\r\n", $result, 2 );
-      return (string) array_pop();
+      return isset( $result[1] ) ? $result[1] : '';
     }
   }
 }
@@ -1808,7 +1808,7 @@ function parse_ini_string($string, $process_sections = FALSE) {
     }
 
     if ($process_sections && $in_sect) {
-      $return[$in_section][trim($keyval[0], '"\' ')] = trim($keyval[1], '"\' ');
+      $return[$in_sect][trim($keyval[0], '"\' ')] = trim($keyval[1], '"\' ');
     }
     else {
       $return[trim($keyval [0], '"\' ')] = trim($keyval[1], '"\' ');
@@ -2119,7 +2119,7 @@ function cache_exists($key = '', $expire = '3600') {
  */
 function cache_delete($key = '') {
 
-  $file = TI_PATH_APP . '/' . TI_FOLDER_CACHE . '/' . md5(dirname($id)) . '-' . md5($id);
+  $file = TI_PATH_APP . '/' . TI_FOLDER_CACHE . '/' . md5( dirname( $key ) ) . '-' . md5( $key );
 
   if ( file_exists($file) ) {
     return unlink($file);
@@ -2840,7 +2840,7 @@ function ucwords_by_char($string = '', $char = '-') {
  * @return string
  */
 function strip_whitespaces($text = '') {
-  return trim( preg_replace( '/(\t|\s)+/', ' ', $html) );
+  return trim( preg_replace( '/(\t|\s)+/', ' ', $text ) );
 }
 
 /**

@@ -204,7 +204,7 @@ if ( !is_cli() && empty( $_SERVER['REMOTE_ADDR'] ) ) {
 // Determine if the request is ajax or not.
 define( 'TI_IS_AJAX', ( strtolower( ifsetor( $_SERVER['HTTP_X_REQUESTED_WITH'] ) ) == 'xmlhttprequest') );
 
-if ( !ifdefor( TI_DISABLE_SESSIONS, FALSE ) ) {
+if ( !ifdefor( 'TI_DISABLE_SESSION', FALSE ) ) {
   // Instantinate session.
   if ( !session_id() ) {
     session_start();
