@@ -34,1444 +34,6 @@
 // For bootstrap instructions @see group "framework bootstrap".
 
 /**
- * @defgroup generic classes
- * @{
- *
- * Define classes Application, Messagebus, Database, Calendar, Image, Pagination
- */
-
-/**
- * Main Application class, provide a flexible MVC alike separation.
- */
-class Application {
-
-  static private $is_main = TRUE;
-  static private $variables = array();
-
-  private $arguments = array();
-
-  /**
-   * Load URL when define new object of Application with parameters.
-   *
-   * @see load() method.
-   *
-   * @access public
-   *
-   * @param string $url
-   * @param bool $return
-   *
-   * @return Application
-   */
-  public function __construct($url = '', $return = FALSE) {
-    if ( $url ) {
-      $this->load( $url, $return );
-    }
-    return $this;
-  }
-
-  /**
-   * Load URL and process it.
-   *
-   * @fire application_load_url
-   *
-   * @access public
-   *
-   * @param string $url
-   *
-   * @return string|NULL
-   */
-  public function load($url = '') {
-
-    $url = '/' . trim( $url, '/' );
-
-    $this->arguments = array();
-
-    $url = do_hook( 'application_load_url', $url );
-
-    // Protect private controllers.
-    if (self::$is_main && preg_match( '#\/(\_|\.)#', $url ) ) {
-      show_404();
-    }
-
-    if ( is_readable( TI_PATH_APP . '/' . TI_FOLDER_CONTROLLER . $url . TI_EXT_CONTROLLER )) {
-      self::$is_main = FALSE;
-      $rule = $url;
-      unset( $url );
-      include( TI_PATH_APP . '/' . TI_FOLDER_CONTROLLER . $rule . TI_EXT_CONTROLLER );
-      if ( TI_AUTORENDER ) {
-        $this->render( $rule );
-      }
-      return TRUE;
-    }
-
-    $rules = _ti_application_routes();
-
-    foreach ( $rules as $rule ) {
-      if ( !$rule ) {
-        continue;
-      }
-      $pattern = strtr( preg_quote( $rule ), array('%s' => '([^\/]+)', '%d' => '([0-9]+)')) . '(?:\/(.*))?';
-      if ( preg_match( '#^' . $pattern . '$#i', $url, $this->arguments )
-          || preg_match( '#^' . $pattern . '$#i', $url . '/index', $this->arguments ) ) {
-
-        unset( $this->arguments[0] );
-        $this->arguments = explode( '/', implode( '/', $this->arguments ) );
-        // Is it correct to strip duplicated / (slashes), maybe sometimes they are placed correctly?!
-        // $this->arguments = array_filter( $this->arguments );
-
-        self::$is_main = FALSE;
-        unset( $rules, $url, $pattern );
-
-        // Checking for controller or controller directory (index.php alike)
-        if ( is_readable( TI_PATH_APP . '/' . TI_FOLDER_CONTROLLER . $rule . TI_EXT_CONTROLLER ) ) {
-          include( TI_PATH_APP . '/' . TI_FOLDER_CONTROLLER . $rule . TI_EXT_CONTROLLER );
-        }
-        elseif ( is_readable( TI_PATH_APP . '/' . TI_FOLDER_CONTROLLER . $rule . '/index' . TI_EXT_CONTROLLER )) {
-          include( TI_PATH_APP . '/' . TI_FOLDER_CONTROLLER . $rule . '/index' . TI_EXT_CONTROLLER );
-        }
-        else {
-          // Switch back to $url.
-          $url = $rule;
-          break;
-        }
-        if ( TI_AUTORENDER ) {
-          $this->render( $rule );
-        }
-        return TRUE;
-      }
-    }
-    if ( self::$is_main ) {
-      show_404();
-    }
-    else {
-      show_error( 'Controller error', 'The controller <strong>' . $url . '</strong> not exists.' );
-    }
-  }
-
-  /**
-   * Render the controller acording the view.
-   *
-   * @access public
-   *
-   * @param string $view
-   *   the view from the TI_FOLDER_VIEW, if it is empty
-   *   then framework will check if it is available
-   *   view with same name as the controller.
-   */
-  public function render() {
-    if ( func_num_args() > 0 ) {
-      if ( is_readable( TI_PATH_APP . '/' . TI_FOLDER_VIEW  . '/' . func_get_arg(0) . TI_EXT_VIEW ) ) {
-        extract( self::$variables, EXTR_REFS );
-        include( TI_PATH_APP . '/' . TI_FOLDER_VIEW  . '/' . func_get_arg(0) . TI_EXT_VIEW );
-      }
-      if ( !TI_AUTORENDER ) {
-        show_error('Template error', 'The template <strong>' . func_get_arg(0) . '</strong> not exists.');
-      }
-    }
-  }
-
-  /**
-   * Get Nth argument or return NULL if it is not exists.
-   *
-   * @param int $n
-   *
-   * @return string|NULL
-   */
-  public function arg($n = 0) {
-    return isset( $this->arguments[$n] ) ? $this->arguments[$n] : NULL;
-  }
-
-  /**
-   * Get all shared variables.
-   *
-   * @access public
-   *
-   * @return array
-   */
-  public function get_vars() {
-    return self::$variables;
-  }
-
-  /**
-   * Magic function that store variables as properties into Application superglobal
-   *
-   * @access public
-   *
-   * @param string $key
-   * @param mixed $value
-   *
-   * @return bool
-   */
-  public function __set($key, $value = NULL) {
-    return ( self::$variables[$key] = $value );
-  }
-
-  /**
-   * Magic function that retrieve  property from Application superglobal
-   *
-   * @access public
-   *
-   * @param string $key
-   *
-   * @return mixed
-   */
-  public function &__get($key) {
-    if ( isset( self::$variables[$key] ) ) {
-      return self::$data[$key];
-    }
-    $val = NULL;
-    return $val;
-  }
-
-}
-
-/**
- * Database wraper class for PDO
- */
-class Database extends PDO {
-
-  /**
-   * Database table's prefix
-   *
-   * @var string
-   */
-  public $prefix = '';
-
-  /**
-   * Wrap table with quotes and prepend with the prefix.
-   *
-   * @access public
-   *
-   * @param string $tablename
-   *
-   * @return string
-   */
-  public function db_table($tablename = '') {
-    return $this->db_column( $this->prefix . $tablename );
-  }
-
-  /**
-   * Wrap column or table with quotes, acording to current database.
-   *
-   * @access public
-   *
-   * @param string $key
-   *
-   * @return string
-   */
-  public function db_column($column_name = '') {
-    if ( $column_name ) {
-      switch ( $this->getDriver() ) {
-        case 'interbase': $sq = '"'; break;
-        case 'mysql': default: $sq = '`';
-      }
-      return $sq . $column_name . $sq;
-    }
-    return '';
-  }
-
-  /**
-   * Get current database type.
-   *
-   * @access public
-   *
-   * @return string
-   */
-  public function getDriver() {
-    return $this->getAttribute( PDO::ATTR_DRIVER_NAME );
-  }
-
-  /**
-   * Perform a query to pdo, it is PDO::query() wrapper
-   *
-   * @see PDO::query()
-   *
-   * @access public
-   *
-   * @param string $querystr
-   * @param array $args
-   *
-   * @return object
-   */
-  public function query($querystr = '', $args = array()) {
-
-    $args = CAST_TO_ARRAY( $args );
-
-    $query = parent::prepare( $querystr );
-    $query->setFetchMode( PDO::FETCH_OBJ) ;
-    $query->execute( $args );
-
-    if ( TI_DEBUG_MODE && (int) $query->errorCode() ) {
-      show_error( 'Database error', vsprintf('<p><strong>%s</strong> %s</p><p>%s</p>', $query->errorInfo() ) );
-    }
-
-    return $query;
-  }
-
-  /**
-   * Build keypair_clause from array, object or url string.
-   *
-   * @access public
-   *
-   * @param mixed $elements
-   * @param args to return &$args
-   * @param string $prepend_clause
-   *   WHERE, HAVING or SET
-   * @param string $separator
-   *   AND, OR,  ',' comma
-   *
-   * @return string
-   */
-  function build_keypair_clause($elements = array(), &$args = array(), $prepend_clause = 'WHERE', $separator = 'AND') {
-
-    $elements = CAST_TO_ARRAY( $elements );
-
-    $prepend_clause = trim( $prepend_clause );
-    $separator = trim( $separator );
-
-    if ($prepend_clause == 'SET') {
-      $separator = ',';
-    }
-
-    foreach ($elements as $key => $val) {
-      if ($prepend_clause !== 'SET' && is_array($val) ) {
-        $q[] = $this->db_column( $key ) . ' IN ( ' . str_repeat( '?', count($val) ) . ')';
-        foreach ( $val as $v ) {
-          $args[] = $v;
-        }
-      }
-      else {
-        $q[] = $this->db_column( $key ) . ' = ? ';
-        $args[] = $val;
-      }
-    }
-
-    $prepend_clause = ' ' . $prepend_clause . ' ';
-    $separator = ' ' . $separator . ' ';
-
-    $querystr = implode($separator, $q);
-
-    if ($querystr) {
-      return $prepend_clause . $querystr;
-    }
-
-  }
-
-  /**
-   * Insert record.
-   *
-   * @access public
-   *
-   * @param string $table
-   * @param mixed $elements
-   *
-   * @return int
-   */
-  function insert($table , $elements) {
-
-    $elements = CAST_TO_ARRAY( $elements );
-
-    $querystr = 'INSERT INTO ' . $this->db_column($table);
-
-    $keys = array();
-    foreach ( array_keys( $elements ) as $key ) {
-      $keys[] = $this->db_column( $key );
-    }
-
-    $querystr.= '(' . implode(',', $keys). ')';
-    $querystr.= 'VALUES(' . implode( ',', array_fill( 0, count( $elements ), '?' ) ). ')';
-
-    $query = $this->prepare( $querystr );
-
-    return $query->execute( array_values( $elements ) );
-  }
-
-  /**
-   * Delete records.
-   *
-   * @access public
-   *
-   * @param string $table
-   *   if it is string, then it allow custom where clause
-   *   if it is array|object then it will be converted.
-   * @param mixed $condition
-   *
-   * @return int
-   */
-  function delete($table = '', $condition = array()) {
-
-    if ( is_string( $condition ) ) {
-      $cond_str = $condition;
-    }
-    else {
-      $cond_str = $this->build_keypair_clause( $condition, $args, 'WHERE', 'AND' );
-    }
-
-    $querystr = 'DELETE FROM ' . $this->db_column( $table ) . $cond_str;
-
-    $this->query( $querystr, $args );
-
-    return $this->affected_rows();
-  }
-
-  /**
-   * Update records.
-   *
-   * @access public
-   *
-   * @param string $table
-   * @param mixed $elements
-   *   if it is string, then it allow custom where clause
-   *   if it is array|object then it will be converted.
-   * @param mixed $condition
-   *
-   * @return int
-   */
-  function update($table = '', $elements = array(), $condition = array()) {
-
-    $set_str = $this->build_keypair_clause($elements, $args, 'SET', ',');
-
-    if ($set_str) {
-
-      if (is_string($condition)) {
-        $cond_str = $condition;
-      }
-      else {
-        $cond_str = $this->build_keypair_clause($condition, $args, 'WHERE', 'AND');
-      }
-
-      $querystr = 'UPDATE ' .
-          $this->db_column($table) .
-          $set_str .
-          $this->build_keypair_clause($condition, $args, 'WHERE', 'AND');
-      $this->query($querystr, $args);
-      return $this->affected_rows();
-    }
-    else {
-      return 0;
-    }
-  }
-
-  /**
-   * Retrieve records from table.
-   *
-   * @access public
-   *
-   * @param string $table
-   * @param array $columns
-   * @param mixed $condition
-   *
-   * @return array
-   */
-  function select($table = '', $columns = array(), $condition = array()) {
-
-    $args = array();
-    $querystr = 'SELECT';
-
-    if (!$columns || $columns == '*') {
-      $querystr .= ' * ';
-    }
-    else {
-      $columns = CAST_TO_ARRAY( $columns );
-      foreach ( $columns as &$col ) {
-        $col = $this->db_column( $col );
-      }
-      $querystr .= ' ' . implode( ', ', $columns );
-    }
-
-    $querystr .= ' FROM ' . $table;
-
-    if (is_string($condition)) {
-      $querystr .= ' WHERE ' . $condition;
-    }
-    else {
-      $querystr .= $this->build_keypair_clause($condition, $args, 'WHERE', 'AND');
-    }
-
-    return $this->query( $querystr, $args )->fetchAll( PDO::FETCH_OBJ );
-  }
-
-}
-
-/**
- * Messagebus class.
- */
-class Messagebus {
-
-  /**
-   * Allowed HTML tags to be used in message body.
-   *
-   * @var $allowed_html_tags
-   *
-   * @access public
-   */
-  public $allowed_html_tags = '<p><div><em><u><b><strong><i><img><a>';
-
-  /**
-   * Add message to the messagebu's queue.
-   *
-   * @access public
-   *
-   * @param string $Text
-   * @param string $Title
-   * @param string $Class
-   * @param array|object $Attributes
-   *
-   * @return boolean
-   */
-  public function add($Text = '', $Title = '', $Class = '', $Attributes = array()) {
-
-    $Attributes = CAST_TO_OBJECT( $Attributes );
-
-    $o = new stdClass;
-    $o->Title = strip_tags( CAST_TO_STRING($Title) );
-    $o->Text = strip_tags( CAST_TO_STRING( $Text ), $this->allowed_html_tags );
-    $o->Class = htmlentities( CAST_TO_STRING($Class) );
-    $o->Attributes = $Attributes;
-
-    $m = session_get( '_ti_mbus' );
-    if ( !is_array($m )) {
-      $m = array();
-    }
-    $m[] = $o;
-    session_set( '_ti_mbus', $m );
-    return TRUE;
-  }
-
-  /**
-   * Get all messages in the queue.
-   *
-   * @access public
-   *
-   * @return array
-   */
-  public function get_all() {
-    return (array) session_get( '_ti_mbus' );
-  }
-
-  /**
-   * Get number of messages in the queue.
-   *
-   * @access public
-   *
-   * @return int
-   */
-  public function count() {
-    return count( session_get( '_ti_mbus' ) );
-  }
-
-  /**
-   * Clear messages in the queue.
-   *
-   * @access public
-   */
-  public function clear() {
-    session_set( '_ti_mbus', array() );
-  }
-
-}
-
-/**
- * Calendar based events.
- */
-class Calendar {
-
-  /**
-   * Link template (spritnf suitable string)
-   *
-   * @var $link_template
-   *
-   * @access public
-   */
-  public $link_template = 'blog/%Y-%m-%d';
-
-  /**
-   * Link all days, instead of these with events only
-   *
-   * @var $link_all_days
-   *
-   * @access public
-   */
-  public $link_all_days = TRUE;
-
-  /**
-   * First day of week is monday.
-   *
-   * @var $first_is_monday
-   *
-   * @access public
-   */
-  public $first_is_monday = TRUE;
-
-  /**
-   * Show weekdays names, instead of numbers.
-   *
-   * @var $show_weekday_names
-   *
-   * @access public
-   */
-  public $show_weekday_names = TRUE;
-
-  /**
-   * Markup to wrap the table (printf suitable string)
-   *
-   * @access public
-   *
-   * @var $html_table_open
-   */
-  public $html_table_wrap = '<table class="table-calendar">%s</table>';
-
-  private $events_dates = array();
-  private $html = '';
-
-  /**
-   * Add event to the calendar.
-   *
-   * @access public
-   *
-   * @param string $date
-   *
-   * @return boolean
-   */
-  public function add_event($date = '', $text = '') {
-
-    if (is_array($date) || is_object($date)) {
-      foreach ( $date as $key => $val ) {
-        $this->add_event( $key, $val );
-      }
-    }
-    else {
-      $date = CAST_TO_STRING( $date );
-    }
-
-    if ( !$date ) {
-      return FALSE;
-    }
-
-    if ( !isset($this->events_dates[$date]) ) {
-      $this->events_dates[$date] = array();
-    }
-
-    $this->events_dates[$date][] = $text;
-
-    return TRUE;
-  }
-
-  /**
-   * Generate the calendar's html
-   *
-   * @access public
-   *
-   * @param date $YMD
-   *
-   * @return Calendar
-   */
-  public function generate($YMD = '') {
-
-    $this->html = '';
-
-    $YMD = explode('-', $YMD);
-
-    if (!$YMD[0]) {
-      $YMD[0] = date('Y');
-    }
-
-    if (!isset($YMD[1])) {
-      $YMD[1] = date('m');
-    }
-
-    if (!isset($YMD[2])) {
-      $YMD[2] = date('d');
-    }
-
-    $Y = str_pad( CAST_TO_INT( $YMD[0] ), 4, 0, STR_PAD_LEFT );
-    $M = str_pad( CAST_TO_INT( $YMD[1], 1, 12 ), 2, 0, STR_PAD_LEFT );
-    $D = str_pad( CAST_TO_INT( $YMD[2], 1, 31 ), 2, 0, STR_PAD_LEFT );
-
-    $day_weekday = date( 'w', mktime( 0, 0, 0, $M, 1, $Y ) );
-    if ( $day_weekday === 0 ) {
-      $day_weekday = 7;
-    }
-
-    $this->html .= '<tr>';
-
-    if ( $this->show_weekday_names) {
-      for ( $i = 0; $i < 7; $i++ ) {
-        $this->html .= '<th>' . $i . '</th>';
-      }
-      $this->html .= '</tr><tr>';
-    }
-
-    for ($i = 1; $i < ($this->first_is_monday ? $day_weekday : $day_weekday + 1); $i++) {
-      $this->html .= '<td class="hidden">&nbsp;</td>';
-    }
-
-    $month_days = date('t', mktime(0, 0, 0, $M, 1, $Y));
-
-    for ($i = 1; $i <= $month_days; $i++) {
-
-      $date = $Y . '-' . $M . '-' . $i;
-      $link = site_url(strftime($this->link_template, strtotime($date)));
-
-      if (isset($this->events_dates[$date])) {
-        $events = count($this->events_dates[$date]);
-      }
-      else {
-        $events = 0;
-      }
-
-      $title = $events ? sprintf(__('Events on this date - %d.'), $events) : __('There is no events on this date');
-
-      if ($this->link_all_days) {
-        $this->html .= '<td><a href="' . $link . '" title="' . $title . '">' . $i . '</a></td>';
-      }
-      elseif ($events) {
-        $this->html .='<td><a href="' . $link . '" title="' . $title . '">' . $i . '</a></td>';
-      }
-      else {
-        $this->html .='<td>' . $i . '</td>';
-      }
-
-      if ($this->first_is_monday) {
-        if ($day_weekday === 7) {
-          $this->html .= "</tr><tr>";
-          $day_weekday = 1;
-          continue;
-        }
-      }
-      else {
-        if ($day_weekday === 7) {
-          $day_weekday = 1;
-          continue;
-        }
-        elseif ($day_weekday === 6) {
-          $this->html .= '</tr><tr>';
-        }
-      }
-      $day_weekday++;
-    }
-
-    for (; $day_weekday <= ($this->first_is_monday ? 7 : 6); $day_weekday++) {
-      $this->html .= '<td>&nbsp;</td>';
-    }
-
-    $this->html .= '</tr>';
-
-    if ( strpos( $this->html_table_wrap, '%s' ) !== FALSE ) {
-      $this->html = sprintf( $this->html_table_wrap, $this->html );
-    }
-
-    return $this;
-  }
-
-  /**
-   * Output the generated calendar html.
-   *
-   * @access public
-   */
-  public function show() {
-    echo $this->html;
-  }
-
-  /**
-   * Return the generated calendar html.
-   *
-   * @access public
-   *
-   * @return string
-   */
-  public function get_html() {
-    return $this->html;
-  }
-
-}
-
-/**
- * Simple class for work with images.
- */
-class Image {
-
-  /**
-   * Quality value of images (used in jpeg files)
-   *
-   * @var int
-   */
-  public $quality = 85;
-
-  private $im = NULL;
-
-  /**
-   * Load image for manipulation from existing file on the filesystem.
-   *
-   * @param string $filename
-   *
-   * @return boolean
-   */
-  function load_from_file($filename = '') {
-
-    if ( !$filename || !is_readable($filename) ) {
-      return FALSE;
-    }
-
-    if ( !($image_info = getimagesize( $filename )) ) {
-      return FALSE;
-    }
-
-    switch ($image_info['mime']) {
-      case 'image/gif':
-        if ( function_exists( 'imagecreatefromgif' ) && ( $this->im = imagecreatefromgif( $filename ) ) ) {
-          return TRUE;
-        }
-        break;
-
-      case 'image/jpeg':
-        if ( function_exists( 'imagecreatefromjpeg' ) && ( $this->im = imagecreatefromjpeg( $filename ) ) ) {
-          return TRUE;
-        }
-        break;
-
-      case 'image/png':
-        if ( function_exists( 'imagecreatefrompng' ) && ( $this->im = imagecreatefrompng( $filename ) ) ) {
-          return TRUE;
-        }
-        break;
-
-      case 'image/wbmp':
-        if ( function_exists( 'imagecreatefromwbmp' ) && ( $this->im = imagecreatefromwbmp( $filename ) ) ) {
-          return TRUE;
-        }
-        break;
-
-      case 'image/xbm':
-        if ( function_exists( 'imagecreatefromxbm' ) && ( $this->im = imagecreatefromxbm( $filename ) ) ) {
-          return TRUE;
-        }
-        break;
-
-      case 'image/xpm':
-        if ( function_exists( 'imagecreatefromxpm' ) && ( $this->im = imagecreatefromxpm( $filename ) ) ) {
-          return TRUE;
-        }
-        break;
-    }
-
-    $this->im = NULL;
-    return FALSE;
-  }
-
-  /**
-   * Load image for manipulation from a file content (string)
-   *
-   * @param string $content
-   *
-   * @return boolean
-   */
-  function load_from_string($content = '') {
-
-    if ( $content && is_string( $content ) && ($i = imagecreatefromstring( $content ) ) ) {
-      $this->im = $i;
-      return TRUE;
-    }
-    return FALSE;
-  }
-
-  /**
-   * Save current image into file.
-   *
-   * @param string $filename
-   *   output filepath
-   * @param int $quality
-   *   override the object quality with custom 0-100
-   * @param int $permissions
-   *
-   * @return boolean
-   */
-  function save_to_file($filename, $quality = FALSE, $permissions = NULL) {
-
-    if ( imagejpeg($this->im, $filename, ( $quality ? $quality : $this->quality)) ) {
-      if ($permissions !== NULL) {
-        chmod($filename, $permissions);
-      }
-      return TRUE;
-    }
-    return FALSE;
-  }
-
-  /**
-   * Get current image resource.
-   *
-   * @return resource
-   */
-  function image() {
-    return $this->im;
-  }
-
-  /**
-   * Get current image height
-   *
-   * @return int
-   */
-  function height() {
-    return imagesy( $this->im );
-  }
-
-  /**
-   * Get current image with.
-   *
-   * @return int
-   */
-  function width() {
-    return imagesx( $this->im );
-  }
-
-  /**
-   * Render the image directly.
-   *
-   * @param int $quality
-   * @param string $type
-   *   gif, jpeg, png
-   *
-   * @return boolean
-   */
-  function output($quality = FALSE, $type = 'jpeg', $send_header = TRUE) {
-
-    switch ($type) {
-      case 'gif' :
-        if ( imagegif($this->im, NULL) ) {
-          if ( $send_header ) {
-            @header( 'Content-type: image/gif' );
-          }
-          return TRUE;
-        }
-      case 'png' :
-        if ( imagepng($this->im, NULL, 8) ) {
-          if ( $send_header ) {
-            @header( 'Content-type: image/png' );
-          }
-          return TRUE;
-        }
-      default:
-        if ( imagejpeg($this->im, NULL, ($quality ? $quality : $this->quality) )) {
-          if ( $send_header ) {
-            @header( 'Content-type: image/jpeg' );
-          }
-          return TRUE;
-        }
-    }
-    return FALSE;
-  }
-
-  /**
-   * Get and return the output from output() method
-   *
-   * @param int $quality
-   * @param string $type
-   *
-   * @return string
-   */
-  function output_get($quality = FALSE, $type = 'jpeg') {
-    ob_start();
-    $this->output( $quality, $type, FALSE );
-    return ob_get_clean();
-  }
-
-  /**
-   * Interlance the current image.
-   *
-   * @return bool
-   */
-  function interlance() {
-    return (bool) imageinterlace( $this->im, TRUE );
-  }
-
-  /**
-   * Resize current image to match te specific height
-   *
-   * @param int $height
-   * @param bool $preserve_smaller
-   *
-   * @return bool
-   */
-  function resize_to_height($height, $preserve_smaller = TRUE) {
-    $ratio = $height / imagesy( $this->im );
-    $width = imagesx( $this->im ) * $ratio;
-    return $this->resize( $width, $height, $preserve_smaller );
-  }
-
-  /**
-   * Resize current image to specific with.
-   *
-   * @param int $width
-   * @param bool $preserve_smaller
-   *
-   * @return bool
-   */
-  function resize_to_width($width, $preserve_smaller = TRUE) {
-    $ratio = $width / imagesx( $this->im );
-    $height = imagesy( $this->im ) * $ratio;
-    return $this->resize ($width, $height, $preserve_smaller );
-  }
-
-  /**
-   * Resize current image to specific size, mean image will be
-   * no heigher and widther than this size.
-   *
-   * @param int $size
-   * @param bool $preserve_smaller
-   *
-   * @return bool
-   */
-  function resize_to_size($size, $preserve_smaller = TRUE) {
-
-    $width_orig = imagesx( $this->im );
-    $height_orig = imagesy( $this->im );
-
-    if ( $width_orig > $height_orig ) {
-      $ratio = $size / $width_orig;
-      $height = $height_orig * $ratio;
-      $width = $size;
-    }
-    else {
-      $ratio = $size / $height_orig;
-      $width = $width_orig * $ratio;
-      $height = $size;
-    }
-
-    return $this->resize( $width, $height, $preserve_smaller );
-  }
-
-  /**
-   * Resize image to absolute width and height.
-   *
-   * @param int $width
-   * @param int $height
-   * @param bool $preserve_smaller
-   *
-   * @return bool
-   */
-  function resize($width, $height, $preserve_smaller = TRUE) {
-
-    if ( $preserve_smaller ) {
-      $width_orig = imagesx( $this->im );
-      $height_orig = imagesy( $this->im );
-      if ( $width_orig < $width && $height_orig < $height ) {
-        return TRUE;
-      }
-    }
-
-    $image_new = imagecreatetruecolor( $width, $height );
-    return imagecopyresampled( $this->im, $this->im, 0, 0, 0, 0, $width, $height, imagesx( $this->im ), imagesy( $this->im ) );
-  }
-
-  /**
-   * Resize and crop current image.
-   *
-   * @param int $width
-   * @param int $height
-   * @param true $preserve_smaller
-   *
-   * @return bool
-   */
-  function resize_cropped($width, $height, $preserve_smaller = TRUE) {
-
-    $width_orig = imagesx( $this->im );
-    $height_orig = imagesy( $this->im );
-    $ratio_orig = $width_orig / $height_orig;
-
-    if ( $preserve_smaller ) {
-      $width_orig = imagesx( $this->im );
-      $height_orig = imagesy( $this->im );
-      if ( $width_orig < $width && $height_orig < $height ) {
-        return TRUE;
-      }
-    }
-
-    if ( $width / $height > $ratio_orig ) {
-      $new_height = $width / $ratio_orig;
-      $new_width = $width;
-    }
-    else {
-      $new_width = $height * $ratio_orig;
-      $new_height = $height;
-    }
-    $x_mid = $new_width / 2;
-    $y_mid = $new_height / 2;
-
-    $image_proccess = imagecreatetruecolor( round( $new_width ), round( $new_height ) );
-    imagecopyresampled( $image_proccess, $this->im, 0, 0, 0, 0, $new_width, $new_height, $width_orig, $height_orig );
-
-    $image_new = imagecreatetruecolor( $width, $height );
-    imagecopyresampled( $image_new, $image_proccess,
-        0, 0, ($x_mid - ($width / 2)), ($y_mid - ($height / 2)),
-        $width, $height, $width, $height);
-    imagedestroy( $image_proccess );
-
-    $this->im = $image_new;
-    imagedestroy( $image_new );
-    return TRUE;
-  }
-
-  /**
-   * Scale the current image.
-   *
-   * @param int $scale
-   * @param bool $preserve_smaller
-   *
-   * @return bool
-   */
-  function scale($scale = '100', $preserve_smaller = TRUE) {
-
-    $width = imagesx( $this->im ) * $scale / 100;
-    $height = imagesy( $this->im ) * $scale / 100;
-    return $this->resize( $width, $height, $preserve_smaller );
-  }
-
-  /**
-   * Rotate the current image.
-   *
-   * @param int $rotate
-   *
-   * @return bool
-   */
-  function rotate($rotate = 90) {
-
-    return (( $this->im = imagerotate($this->im, CAST_TO_INT($rotate), 0) ));
-  }
-
-  /**
-   * Add wattermark to the iamge.
-   *
-   * @param string $text
-   * @param int $fontsize
-   * @param string $font
-   *   path to TTF font for using
-   * @param string $position
-   *   TOP BOTTOM LEFT RIGHT
-   *
-   * @return bool
-   */
-  function wattermark_text($text = '', $fontsize = 18, $font = '', $position = 'RIGHT BOTTOM') {
-
-    $text = trim( CAST_TO_STRING( $text ));
-
-    if ( !$text ) {
-      return FALSE;
-    }
-
-    $fontsize = CAST_TO_INT( $fontsize, 1, 120 );
-
-    $black = imagecolorallocate( $this->im, 0, 0, 0 );
-
-    list( $pos[0], $post[1] ) = explode( ' ', $position );
-
-    if ( strpos( $position, 'LEFT' ) !== FALSE ) {
-      $mark_x = 10;
-    }
-    else {
-      $mark_x = imagesx( $this->im ) - 10 - strlen( $text ) * $fontsize;
-    }
-
-    if ( strpos($position, 'TOP') !== FALSE) {
-      $mark_y = 10;
-    }
-    else {
-      $mark_y = imagesy( $this->im ) - 10 - $fontsize;
-    }
-
-    return (bool) imagettftext( $this->im, $fontsize, 0, $mark_x, $mark_y, $black, $font, $text );
-
-  }
-
-  /**
-   * Add wattermark to the image.
-   *
-   * @param string $image
-   *   path to image that will be used for wattermark
-   * @param int $size
-   * @param string $position
-   *   TOP BOTTOM LEFT RIGHT
-   *
-   * @return bool
-   */
-  function wattermark_image($imagefile, $size = 0, $position = 'RIGHT BOTTOM') {
-
-    if ( !$imagefile ) {
-      return FALSE;
-    }
-
-    $wim = new Image;
-    if (!$wim->load_from_file( $imagefile )) {
-      return FALSE;
-    }
-
-    if ($size) {
-      $wim->resize_to_size( CAST_TO_INT( $size, 8, 640 ), TRUE );
-    }
-
-    $mark_w = $wim->width();
-    $mark_h = $wim->height();
-
-    if (strpos($position, 'LEFT') !== FALSE) {
-      $mark_x = 10;
-    }
-    else {
-      $mark_x = $this->width() - 10 - $mark_w;
-    }
-
-    if (strpos($position, 'TOP') !== FALSE) {
-      $mark_y = 10;
-    }
-    else {
-      $mark_y = $this->height() - 10 - $mark_h;
-    }
-
-    return (bool) imagecopy($this->im, $wim->image(), $mark_x, $mark_y, 0, 0, $mark_w, $mark_h);
-
-  }
-
-  /**
-   * Convert current image to ascii.
-   *
-   * @param bool $binary
-   *    create 1010 like ascii
-   *
-   * @return string
-   */
-  function to_ascii($binary = TRUE) {
-
-    $text = '';
-    $width = imagesx($this->im);
-    $height = imagesy($this->im);
-
-    for ($h = 1; $h < $height; $h++) {
-
-      for ($w = 1; $w <= $width; $w++) {
-
-        $rgb = imagecolorat($this->im, $w, $h);
-        $r = ($rgb >> 16) & 0xFF;
-        $g = ($rgb >> 8) & 0xFF;
-        $b = $rgb & 0xFF;
-
-        if ($binary) {
-          $hex = '#' . str_pad( dechex( $r ), 2, '0', STR_PAD_LEFT )
-          . str_pad( dechex( $g ), 2, '0', STR_PAD_LEFT )
-          . str_pad( dechex( $b ), 2, '0', STR_PAD_LEFT );
-
-          if ($w == $width) {
-            $text .= '<br />';
-          }
-          else {
-            $text .= '<span style="color:' . $hex . ';">#</span>';
-          }
-        }
-        else {
-          if ( $r + $g + $b > 382 ) {
-            $text .= '0';
-          }
-          else {
-            $text .= '1';
-          }
-        }
-      }
-
-    }
-
-    return $text;
-  }
-
-}
-
-/**
- * Simple pagination class
- */
-class Pagination {
-
-  /**
-   * Current page
-   */
-  public $current_page = 1;
-
-  /**
-   * Total num of records to paginate
-   */
-  public $total_rows = 100;
-
-  /**
-   * How many per page to show
-   */
-  public $per_page = 20;
-
-  /**
-   * Base url, printf format
-   */
-  public $base_url = '';
-
-  /**
-   * How many cells to show
-   */
-  public $size = 10;
-
-  /**
-   * Format of normal cell (printf format)
-   */
-  public $html_cell_normal = '<a href="%s">%s</a>';
-
-  /**
-   * Format of active cell (printf format)
-   */
-  public $html_cell_active = '<a href="%s" class="active">%s</a>';
-
-  /**
-   * Format of first cell (printf format)
-   */
-  public $html_cell_first = '<a href="%s">&#8592;</a>';
-
-  /**
-   * Format of last cell (printf format)
-   */
-  public $html_cell_last = '<a href="%s">&#8594;</a>';
-
-  /**
-   * Format of wrapper (printf format)
-   */
-  public $html_wrapper = '<div class="pagination">%s</div>';
-
-  private $html = '';
-
-  /**
-   * Constructor, if array or object is passed, then initialize the object with vals.
-   *
-   * @param mixed
-   *
-   * @return Pagination
-   */
-  function __construct($config = array()) {
-
-    $config = do_hook( 'pagination_config', $config );
-
-    if ( $config ) {
-      foreach ( CAST_TO_ARRAY( $config ) as $key => $val ) {
-        if ( isset($this->{$key}) ) {
-          $this->{$key} = $val;
-        }
-      }
-    }
-    return $this;
-  }
-
-  /**
-   * Generate the paginator
-   *
-   * @return Pagination
-   */
-  public function generate() {
-
-    if ( $this->per_page >= $this->total_rows ) {
-      return FALSE;
-    }
-
-    $html = '';
-
-    $this->per_page = CAST_TO_INT($this->per_page, 1);
-
-    $page_num_last = ceil( $this->total_rows / $this->per_page );
-
-    if ( $this->current_page > $page_num_last ) {
-      $this->current_page = $page_num_last;
-    }
-    elseif ($this->current_page < 1) {
-      $this->current_page = 1;
-    }
-
-    $page_num_prev = $this->current_page > 1 ? $this->current_page - 1 : 1;
-    $page_num_next = $this->current_page < $page_num_last ? $this->current_page + 1 : $page_num_last;
-
-    if ( $this->size ) {
-      $half_size = floor($this->size / 2);
-
-      $even = $this->size % 2 ? 1 : 0;
-
-      $for_loops = $this->current_page + $half_size + $even;
-      $i = $this->current_page - $half_size + 1;
-
-      if ($this->current_page - $half_size < 1) {
-        $for_loops = $this->size;
-        $i = 1;
-      }
-
-      if ($for_loops > $page_num_last) {
-        $for_loops = $page_num_last;
-        $i = $page_num_last - $this->size + 1;
-      }
-
-      if ($i < 1) {
-        $i = 1;
-      }
-    }
-    else {
-      $for_loops = $page_num_last;
-      $i = 1;
-    }
-
-    if ( $this->current_page > 1 ) {
-      if ( $this->html_cell_first ) {
-        $html .= sprintf( $this->html_cell_first, site_url( sprintf( $this->base_url, 1 ) ) );
-      }
-    }
-
-    for ($s = 1; $i <= $for_loops; $i++, $s++) {
-      $uri = site_url( sprintf( $this->base_url, $i ) );
-
-      if ($this->current_page == $i) {
-        $html .= sprintf( $this->html_cell_active, $uri, $i );
-      }
-      else {
-        $html .= sprintf( $this->html_cell_normal, $uri, $i );
-      }
-    }
-
-    if ( $page_num_last > $this->current_page ) {
-      if ( $this->html_cell_last ) {
-        $html .= sprintf( $this->html_cell_last, site_url( sprintf( $this->base_url, $page_num_last ) ) );
-      }
-    }
-
-    if ( !$html ) {
-      return '';
-    }
-
-    if ( $this->html_wrapper ) {
-      $html = sprintf( $this->html_wrapper, $html );
-    }
-
-    $this->html = $html;
-
-    return $this;
-  }
-
-  /**
-   * Output the generated calendar html.
-   */
-  public function show() {
-    echo $this->html;
-  }
-
-  /**
-   * Return the generated calendar html.
-   *
-   * @return string
-   */
-  public function get_html() {
-    return $this->html;
-  }
-
-}
-
-/**
- * @} End of "defgroup framework classes".
- */
-
-/**
  * @defgroup generic functions
  * @{
  *
@@ -2821,7 +1383,7 @@ function array_cast($array = array(), $array_types = array()) {
  * @return bool
  */
 function array_is_assoc($array = array()) {
-  return array_keys($array) !== range(0, count($array) - 1);
+  return array_keys($array) !== range(0, count( $array ) - 1);
 }
 
 /**
@@ -3180,7 +1742,7 @@ function send_mail($to = '', $subject = '(No subject)', $message = '', $header =
     $header_ .= $key . ': ' . $val . (PHP_OS == 'Windows' ? "\n.." : "\r\n");
   }
 
-  unset($header);
+  unset( $header );
 
   $send_mail_fn = 'mail';
 
@@ -3321,7 +1883,7 @@ function make_hash($string = '') {
     return '';
   }
 
-  return md5( TI_APP_SECRET . str_rot13( CAST_TO_STRING($string) ) );
+  return md5( TI_APP_SECRET . str_rot13( CAST_TO_STRING( $string ) ) );
 }
 
 /**
@@ -3530,7 +2092,7 @@ function session_get($key = '', $fallback = NULL) {
  *
  * @param string $id
  */
-function create_nonce($id = 'global') {
+function create_nonce($id = '') {
   $n = make_hash( microtime() );
   session_set( '_ti_nonce_' . make_hash( $id ), $n );
   return $n;
@@ -3544,7 +2106,7 @@ function create_nonce($id = 'global') {
  *
  * @return bool
  */
-function check_nonce($id = 'global', $nonce_key = '') {
+function check_nonce($id = '', $nonce_key = '') {
   return ( strcmp( CAST_TO_STRING($nonce_key), session_get('_ti_nonce_' . make_hash( $id )) === 0));
 }
 
@@ -3640,7 +2202,7 @@ function do_hook($hook_name, $value = NULL) {
 
   foreach ( $_HOOKS[$hook_name] as $hook_priority ) {
     foreach ( $hook_priority as $hook ) {
-      if ( is_callable($hook) ) {
+      if ( is_callable( $hook ) ) {
         $value = call_user_func_array($hook, $args);
       }
     }
@@ -3696,7 +2258,7 @@ function cache_put($key = '', $data = NULL) {
 
   $directory = TI_PATH_APP . '/' . TI_FOLDER_CACHE . '/';
 
-  if ( !is_dir($directory) && !mkdir( $directory, 0700, TRUE )) {
+  if ( !is_dir( $directory ) && !mkdir( $directory, 0700, TRUE )) {
     return FALSE;
   }
 
@@ -3713,7 +2275,7 @@ function cache_put($key = '', $data = NULL) {
  */
 function cache_get($key = '', $expire = '3600') {
   $cache_exists = cache_exists( $key, $expire );
-  if ($cache_exists === FALSE) {
+  if ( $cache_exists === FALSE ) {
     return FALSE;
   }
   return file_get_contents( $cache_exists );
@@ -3734,8 +2296,8 @@ function cache_exists($key = '', $expire = '3600') {
 
   $directory = TI_PATH_APP . '/' . TI_FOLDER_CACHE . '/';
 
-  if (is_readable($directory . $file)) {
-    if (filemtime($directory . $file) < (time() + $expire)) {
+  if ( is_readable( $directory . $file ) ) {
+    if ( filemtime( $directory . $file ) < ( time() + $expire ) ) {
       return $directory . $file;
     }
   }
@@ -3860,7 +2422,7 @@ function make_clickable($text = '', $anchor_length = 40, $attributes = array('ta
   }
 
   $text = preg_replace( '@(?<![.*">])\b(?:(?:https?|ftp|file)://|[a-z]\.)[-A-Z0-9+&#/%=~_|$?!:,.]*[A-Z0-9+&#/%=~_|$]@ei', '\'<a href="\0"'.$custom_attributes.'>\'.substr_middle("\\0", ' . $anchor_length . ').\'</a>\'', $text );
-  $text = preg_replace('#\b([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,6})\b#ei', '\'<a href="mailto:\'.urlencode("\\0").\'" '.$custom_attributes.'>\'.substr_middle("\\0", ' . $anchor_length . ').\'</a>\'', $text);
+  $text = preg_replace( '#\b([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,6})\b#ei', '\'<a href="mailto:\'.urlencode("\\0").\'" '.$custom_attributes.'>\'.substr_middle("\\0", ' . $anchor_length . ').\'</a>\'', $text );
 
   return $text;
 }
@@ -4002,8 +2564,8 @@ function evalute_math( $string = '', &$sanitized_string = '' ) {
  */
 function is_123_set($string = '', $min = 0, $max = NULL) {
   return preg_match('/^[0-9]+(\s{0,1}\,\s{0,1}[0-9]+){' .
-      ($min ? intval($min) - 1 : 0) . ',' .
-      ($max ? intval($max) - 1 : NULL) . '}$/', CAST_TO_STRING($string)) ? TRUE : FALSE;
+      ( $min ? intval( $min ) - 1 : 0) . ',' .
+      ( $max ? intval( $max ) - 1 : NULL) . '}$/', CAST_TO_STRING( $string ) ) ? TRUE : FALSE;
 }
 
 /**
@@ -4026,9 +2588,9 @@ function is_123_set($string = '', $min = 0, $max = NULL) {
  * @return bool
  */
 function is_abc_set($string = '', $min = 0, $max = NULL) {
-  return preg_match('/^[a-z]+(\s{0,1}\,\s{0,1}[a-z]+){' .
-      ($min ? intval($min) - 1 : 0) . ',' .
-      ($max ? intval($max) - 1 : NULL) . '}$/i', CAST_TO_STRING($string)) ? TRUE : FALSE;
+  return preg_match( '/^[a-z]+(\s{0,1}\,\s{0,1}[a-z]+){' .
+      ( $min ? intval($min) - 1 : 0) . ',' .
+      ( $max ? intval($max) - 1 : NULL) . '}$/i', CAST_TO_STRING( $string ) ) ? TRUE : FALSE;
 }
 
 /**
@@ -4068,9 +2630,9 @@ function is_123abc_set($string = '', $min = 0, $max = NULL) {
  * @return bool
  */
 function is_word_set($string = '', $min = 0, $max = NULL) {
-  return preg_match('/^[^\/\\$&?]+(\s{0,1}\,\s{0,1}[^\/\\$&?]+){' .
-      ($min ? intval($min) - 1 : 0) . ',' .
-      ($max ? intval($max) - 1 : NULL) . '}$/i', CAST_TO_STRING($string)) ? TRUE : FALSE;
+  return preg_match( '/^[^\/\\$&?]+(\s{0,1}\,\s{0,1}[^\/\\$&?]+){' .
+      ( $min ? intval( $min ) - 1 : 0) . ',' .
+      ( $max ? intval( $max ) - 1 : NULL) . '}$/i', CAST_TO_STRING( $string ) ) ? TRUE : FALSE;
 }
 
 /**
@@ -4280,7 +2842,7 @@ function path_to_human($string = '') {
   $string = CAST_TO_STRING( $string );
   $string = preg_replace( '/[\t\s\_\-\.\=\?\+]/', ' ', $string );
   $string = preg_replace( '/\s{2,}/', ' ', $string );
-  $string = ucwords( strtolower($string) );
+  $string = ucwords( strtolower( $string ) );
   return $string;
 }
 
@@ -4529,8 +3091,8 @@ function num_to_month($num = 0, $long_names = FALSE) {
  */
 function sql_now($timestamp = 0) {
   return !$timestamp
-  ? date( 'Y-m-d H:i:s' )
-  : date( 'Y-m-d H:i:s', $timestamp );
+    ? date( 'Y-m-d H:i:s' )
+    : date( 'Y-m-d H:i:s', $timestamp );
 }
 
 /**
@@ -4547,43 +3109,43 @@ function sql_type_to_widget( $type = '' ) {
   $type = CAST_TO_STRING( $type );
 
   if ( preg_match('/^(tinyint\(1\)|bool|boolean)/i', $type) ) {
-    $widget = 'BOOLEAN';
+    $widget = 'checkbox';
   }
 
   elseif ( preg_match('/^(tinyint|mediumint|int|smallint|bigint|numeric|real|double|float)/i', $type)) {
-    $widget = 'NUMBER';
+    $widget = 'number';
   }
 
   elseif ( preg_match('/^(tinytext|text|mediumtext|longtext)/i', $type) ) {
-    $widget = 'TEXTAREA';
+    $widget = 'textarea';
   }
 
   elseif ( preg_match('/^(tinyblob|blob|mediumblob|longblob)/i', $type) ) {
-    $widget = 'FILE';
+    $widget = 'file';
   }
 
   elseif ( preg_match('/^(timestamp|datetime)/i', $type) ) {
-    $widget = 'DATETIME';
+    $widget = 'datetime';
   }
 
   elseif ( preg_match('/^date/i', $type) ) {
-    $widget = 'DATE';
+    $widget = 'date';
   }
 
   elseif ( preg_match('/^time/i', $type) ) {
-    $widget = 'TIME';
+    $widget = 'time';
   }
 
   elseif ( preg_match('/^set\(.*\)/i', $type) ) {
-    $widget = 'CHECKBOX';
+    $widget = 'checkboxes';
   }
 
   elseif ( preg_match('/^enum\(.*\)/i', $type) ) {
-    $widget = 'SELECT';
+    $widget = 'select';
   }
 
   else {
-    $widget = 'TEXT';
+    $widget = 'text';
   }
 
   return do_hook( 'sql_type_to_widget', $widget, $type );
@@ -4610,19 +3172,16 @@ function sql_is_time_interval( $string = '' ) {
  * @return array
  */
 function sql_get_enum_values($columntype = '') {
-
-  $columntype = CAST_TO_STRING($columntype);
-
-  if ( preg_match('/^set\((.*)\)/i', $columntype, $matches) || preg_match('/^enum\((.*)\)/i', $columntype, $matches) ) {
+  $columntype = CAST_TO_STRING( $columntype );
+  if ( preg_match( '/^set\((.*)\)/i', $columntype, $matches ) || preg_match( '/^enum\((.*)\)/i', $columntype, $matches ) ) {
     if ( count($matches) > 0 ) {
       $matches = explode( ',', array_pop( $matches ) );
-      foreach($matches as $key => $val) {
-        $matches[$key] = trim( $val, '\'"' );
+      foreach( $matches as $key => $val ) {
+        $matches[trim( $key )] = trim( $val, '\'"' );
       }
       return $matches;
     }
   }
-
   return array();
 }
 
@@ -4642,7 +3201,7 @@ function sql_get_enum_values($columntype = '') {
  */
 function transliterate($string = '', $from_latin = FALSE) {
 
-  if ( !is_string($string) ) {
+  if ( !is_string( $string ) ) {
     return '';
   }
 
@@ -4678,6 +3237,1471 @@ function transliterate($string = '', $from_latin = FALSE) {
 
 
 /**
+ * @defgroup generic classes
+ * @{
+ *
+ * Define classes Application, Messagebus, Database, Calendar, Image, Pagination
+ */
+
+if ( !class_exists( 'Application') ):
+/**
+ * Main Application class, provide a flexible MVC alike separation.
+ */
+class Application {
+
+  static private $is_main = TRUE;
+  static private $variables = array();
+
+  private $arguments = array();
+
+  /**
+   * Load URL when define new object of Application with parameters.
+   *
+   * @see load() method.
+   *
+   * @access public
+   *
+   * @param string $url
+   * @param bool $return
+   *
+   * @return Application
+   */
+  public function __construct($url = '', $return = FALSE) {
+    if ( $url ) {
+      $this->load( $url, $return );
+    }
+    return $this;
+  }
+
+  /**
+   * Load URL and process it.
+   *
+   * @fire application_load_url
+   *
+   * @access public
+   *
+   * @param string $url
+   *
+   * @return string|NULL
+   */
+  public function load($url = '') {
+
+    $url = '/' . trim( $url, '/' );
+
+    $this->arguments = array();
+
+    $url = do_hook( 'application_load_url', $url );
+
+    // Protect private controllers.
+    if (self::$is_main && preg_match( '#\/(\_|\.)#', $url ) ) {
+      show_404();
+    }
+
+    if ( is_readable( TI_PATH_APP . '/' . TI_FOLDER_CONTROLLER . $url . TI_EXT_CONTROLLER )) {
+      self::$is_main = FALSE;
+      $rule = $url;
+      unset( $url );
+      include( TI_PATH_APP . '/' . TI_FOLDER_CONTROLLER . $rule . TI_EXT_CONTROLLER );
+      if ( TI_AUTORENDER ) {
+        $this->render( $rule );
+      }
+      return TRUE;
+    }
+
+    $rules = _ti_application_routes();
+
+    foreach ( $rules as $rule ) {
+      if ( !$rule ) {
+        continue;
+      }
+      $pattern = strtr( preg_quote( $rule ), array('%s' => '([^\/]+)', '%d' => '([0-9]+)')) . '(?:\/(.*))?';
+      if ( preg_match( '#^' . $pattern . '$#i', $url, $this->arguments )
+          || preg_match( '#^' . $pattern . '$#i', $url . '/index', $this->arguments ) ) {
+
+        unset( $this->arguments[0] );
+        $this->arguments = explode( '/', implode( '/', $this->arguments ) );
+        // Is it correct to strip duplicated / (slashes), maybe sometimes they are placed correctly?!
+        // $this->arguments = array_filter( $this->arguments );
+
+        self::$is_main = FALSE;
+        unset( $rules, $url, $pattern );
+
+        // Checking for controller or controller directory (index.php alike)
+        if ( is_readable( TI_PATH_APP . '/' . TI_FOLDER_CONTROLLER . $rule . TI_EXT_CONTROLLER ) ) {
+          include( TI_PATH_APP . '/' . TI_FOLDER_CONTROLLER . $rule . TI_EXT_CONTROLLER );
+        }
+        elseif ( is_readable( TI_PATH_APP . '/' . TI_FOLDER_CONTROLLER . $rule . '/index' . TI_EXT_CONTROLLER )) {
+          include( TI_PATH_APP . '/' . TI_FOLDER_CONTROLLER . $rule . '/index' . TI_EXT_CONTROLLER );
+        }
+        else {
+          // Switch back to $url.
+          $url = $rule;
+          break;
+        }
+        if ( TI_AUTORENDER ) {
+          $this->render( $rule );
+        }
+        return TRUE;
+      }
+    }
+    if ( self::$is_main ) {
+      show_404();
+    }
+    else {
+      show_error( 'Controller error', 'The controller <strong>' . $url . '</strong> not exists.' );
+    }
+  }
+
+  /**
+   * Render the controller acording the view.
+   *
+   * @access public
+   *
+   * @param string $view
+   *   the view from the TI_FOLDER_VIEW, if it is empty
+   *   then framework will check if it is available
+   *   view with same name as the controller.
+   */
+  public function render() {
+    if ( func_num_args() > 0 ) {
+      if ( is_readable( TI_PATH_APP . '/' . TI_FOLDER_VIEW  . '/' . func_get_arg(0) . TI_EXT_VIEW ) ) {
+        extract( self::$variables, EXTR_REFS );
+        include( TI_PATH_APP . '/' . TI_FOLDER_VIEW  . '/' . func_get_arg(0) . TI_EXT_VIEW );
+      }
+      if ( !TI_AUTORENDER ) {
+        show_error('Template error', 'The template <strong>' . func_get_arg(0) . '</strong> not exists.');
+      }
+    }
+  }
+
+  /**
+   * Get Nth argument or return NULL if it is not exists.
+   *
+   * @param int $n
+   *
+   * @return string|NULL
+   */
+  public function arg($n = 0) {
+    return isset( $this->arguments[$n] ) ? $this->arguments[$n] : NULL;
+  }
+
+  /**
+   * Get all shared variables.
+   *
+   * @access public
+   *
+   * @return array
+   */
+  public function get_vars() {
+    return self::$variables;
+  }
+
+  /**
+   * Magic function that store variables as properties into Application superglobal
+   *
+   * @access public
+   *
+   * @param string $key
+   * @param mixed $value
+   *
+   * @return bool
+   */
+  public function __set($key, $value = NULL) {
+    return ( self::$variables[$key] = $value );
+  }
+
+  /**
+   * Magic function that retrieve  property from Application superglobal
+   *
+   * @access public
+   *
+   * @param string $key
+   *
+   * @return mixed
+   */
+  public function &__get($key) {
+    if ( isset( self::$variables[$key] ) ) {
+      return self::$data[$key];
+    }
+    $val = NULL;
+    return $val;
+  }
+
+}
+endif;
+
+if ( !class_exists( 'Database') ):
+/**
+ * Database wraper class for PDO
+ */
+class Database extends PDO {
+
+  /**
+   * Database table's prefix
+   *
+   * @var string
+   */
+  public $prefix = '';
+
+  /**
+   * Wrap table with quotes and prepend with the prefix.
+   *
+   * @access public
+   *
+   * @param string $tablename
+   *
+   * @return string
+   */
+  public function db_table($tablename = '') {
+    return $this->db_column( $this->prefix . $tablename );
+  }
+
+  /**
+   * Wrap column or table with quotes, acording to current database.
+   *
+   * @access public
+   *
+   * @param string $key
+   *
+   * @return string
+   */
+  public function db_column($column_name = '') {
+    if ( $column_name ) {
+      switch ( $this->getDriver() ) {
+        case 'interbase': $sq = '"'; break;
+        case 'mysql': default: $sq = '`';
+      }
+      return $sq . $column_name . $sq;
+    }
+    return '';
+  }
+
+  /**
+   * Get current database type.
+   *
+   * @access public
+   *
+   * @return string
+   */
+  public function getDriver() {
+    return $this->getAttribute( PDO::ATTR_DRIVER_NAME );
+  }
+
+  /**
+   * Perform a query to pdo, it is PDO::query() wrapper
+   *
+   * @see PDO::query()
+   *
+   * @access public
+   *
+   * @param string $querystr
+   * @param array $args
+   *
+   * @return object
+   */
+  public function query($querystr = '', $args = array()) {
+
+    $args = CAST_TO_ARRAY( $args );
+
+    $query = parent::prepare( $querystr );
+    $query->setFetchMode( PDO::FETCH_OBJ) ;
+    $query->execute( $args );
+
+    if ( TI_DEBUG_MODE && (int) $query->errorCode() ) {
+      show_error( 'Database error', vsprintf('<p><strong>%s</strong> %s</p><p>%s</p>', $query->errorInfo() ) );
+    }
+
+    return $query;
+  }
+
+  /**
+   * Build keypair_clause from array, object or url string.
+   *
+   * @access public
+   *
+   * @param mixed $elements
+   * @param args to return &$args
+   * @param string $prepend_clause
+   *   WHERE, HAVING or SET
+   * @param string $separator
+   *   AND, OR,  ',' comma
+   *
+   * @return string
+   */
+  function build_keypair_clause($elements = array(), &$args = array(), $prepend_clause = 'WHERE', $separator = 'AND') {
+
+    $elements = CAST_TO_ARRAY( $elements );
+
+    $prepend_clause = trim( $prepend_clause );
+    $separator = trim( $separator );
+
+    if ($prepend_clause == 'SET') {
+      $separator = ',';
+    }
+
+    foreach ($elements as $key => $val) {
+      if ($prepend_clause !== 'SET' && is_array($val) ) {
+        $q[] = $this->db_column( $key ) . ' IN ( ' . str_repeat( '?', count($val) ) . ')';
+        foreach ( $val as $v ) {
+          $args[] = $v;
+        }
+      }
+      else {
+        $q[] = $this->db_column( $key ) . ' = ? ';
+        $args[] = $val;
+      }
+    }
+
+    $prepend_clause = ' ' . $prepend_clause . ' ';
+    $separator = ' ' . $separator . ' ';
+
+    $querystr = implode($separator, $q);
+
+    if ($querystr) {
+      return $prepend_clause . $querystr;
+    }
+
+  }
+
+  /**
+   * Insert record.
+   *
+   * @access public
+   *
+   * @param string $table
+   * @param mixed $elements
+   *
+   * @return int
+   */
+  function insert($table , $elements) {
+
+    $elements = CAST_TO_ARRAY( $elements );
+
+    $querystr = 'INSERT INTO ' . $this->db_column($table);
+
+    $keys = array();
+    foreach ( array_keys( $elements ) as $key ) {
+      $keys[] = $this->db_column( $key );
+    }
+
+    $querystr.= '(' . implode(',', $keys). ')';
+    $querystr.= 'VALUES(' . implode( ',', array_fill( 0, count( $elements ), '?' ) ). ')';
+
+    $query = $this->prepare( $querystr );
+
+    return $query->execute( array_values( $elements ) );
+  }
+
+  /**
+   * Delete records.
+   *
+   * @access public
+   *
+   * @param string $table
+   *   if it is string, then it allow custom where clause
+   *   if it is array|object then it will be converted.
+   * @param mixed $condition
+   *
+   * @return int
+   */
+  function delete($table = '', $condition = array()) {
+
+    if ( is_string( $condition ) ) {
+      $cond_str = $condition;
+    }
+    else {
+      $cond_str = $this->build_keypair_clause( $condition, $args, 'WHERE', 'AND' );
+    }
+
+    $querystr = 'DELETE FROM ' . $this->db_column( $table ) . $cond_str;
+
+    $this->query( $querystr, $args );
+
+    return $this->affected_rows();
+  }
+
+  /**
+   * Update records.
+   *
+   * @access public
+   *
+   * @param string $table
+   * @param mixed $elements
+   *   if it is string, then it allow custom where clause
+   *   if it is array|object then it will be converted.
+   * @param mixed $condition
+   *
+   * @return int
+   */
+  function update($table = '', $elements = array(), $condition = array()) {
+
+    $set_str = $this->build_keypair_clause($elements, $args, 'SET', ',');
+
+    if ($set_str) {
+
+      if (is_string($condition)) {
+        $cond_str = $condition;
+      }
+      else {
+        $cond_str = $this->build_keypair_clause($condition, $args, 'WHERE', 'AND');
+      }
+
+      $querystr = 'UPDATE ' .
+          $this->db_column($table) .
+          $set_str .
+          $this->build_keypair_clause($condition, $args, 'WHERE', 'AND');
+      $this->query($querystr, $args);
+      return $this->affected_rows();
+    }
+    else {
+      return 0;
+    }
+  }
+
+  /**
+   * Retrieve records from table.
+   *
+   * @access public
+   *
+   * @param string $table
+   * @param array $columns
+   * @param mixed $condition
+   *
+   * @return array
+   */
+  function select($table = '', $columns = array(), $condition = array()) {
+
+    $args = array();
+    $querystr = 'SELECT';
+
+    if (!$columns || $columns == '*') {
+      $querystr .= ' * ';
+    }
+    else {
+      $columns = CAST_TO_ARRAY( $columns );
+      foreach ( $columns as &$col ) {
+        $col = $this->db_column( $col );
+      }
+      $querystr .= ' ' . implode( ', ', $columns );
+    }
+
+    $querystr .= ' FROM ' . $table;
+
+    if (is_string($condition)) {
+      $querystr .= ' WHERE ' . $condition;
+    }
+    else {
+      $querystr .= $this->build_keypair_clause($condition, $args, 'WHERE', 'AND');
+    }
+
+    return $this->query( $querystr, $args )->fetchAll( PDO::FETCH_OBJ );
+  }
+
+}
+endif;
+
+if ( !class_exists( 'Messagebus') ):
+/**
+ * Messagebus class.
+ */
+class Messagebus {
+
+  /**
+   * Allowed HTML tags to be used in message body.
+   *
+   * @var $allowed_html_tags
+   *
+   * @access public
+   */
+  public $allowed_html_tags = '<p><div><em><u><b><strong><i><img><a>';
+
+  /**
+   * Add message to the messagebu's queue.
+   *
+   * @access public
+   *
+   * @param string $Text
+   * @param string $Title
+   * @param string $Class
+   * @param array|object $Attributes
+   *
+   * @return boolean
+   */
+  public function add($Text = '', $Title = '', $Class = '', $Attributes = array()) {
+
+    $Attributes = CAST_TO_OBJECT( $Attributes );
+
+    $o = new stdClass;
+    $o->Title = strip_tags( CAST_TO_STRING($Title) );
+    $o->Text = strip_tags( CAST_TO_STRING( $Text ), $this->allowed_html_tags );
+    $o->Class = htmlentities( CAST_TO_STRING($Class) );
+    $o->Attributes = $Attributes;
+
+    $m = session_get( '_ti_mbus' );
+    if ( !is_array($m )) {
+      $m = array();
+    }
+    $m[] = $o;
+    session_set( '_ti_mbus', $m );
+    return TRUE;
+  }
+
+  /**
+   * Get all messages in the queue.
+   *
+   * @access public
+   *
+   * @return array
+   */
+  public function get_all() {
+    return (array) session_get( '_ti_mbus' );
+  }
+
+  /**
+   * Get number of messages in the queue.
+   *
+   * @access public
+   *
+   * @return int
+   */
+  public function count() {
+    return count( session_get( '_ti_mbus' ) );
+  }
+
+  /**
+   * Clear messages in the queue.
+   *
+   * @access public
+   */
+  public function clear() {
+    session_set( '_ti_mbus', array() );
+  }
+
+}
+endif;
+
+if ( !class_exists( 'Calendar') ):
+/**
+ * Calendar based events.
+ */
+class Calendar {
+
+  /**
+   * Link template (spritnf suitable string)
+   *
+   * @var $link_template
+   *
+   * @access public
+   */
+  public $link_template = 'blog/%Y-%m-%d';
+
+  /**
+   * Link all days, instead of these with events only
+   *
+   * @var $link_all_days
+   *
+   * @access public
+   */
+  public $link_all_days = TRUE;
+
+  /**
+   * First day of week is monday.
+   *
+   * @var $first_is_monday
+   *
+   * @access public
+   */
+  public $first_is_monday = TRUE;
+
+  /**
+   * Show weekdays names, instead of numbers.
+   *
+   * @var $show_weekday_names
+   *
+   * @access public
+   */
+  public $show_weekday_names = TRUE;
+
+  /**
+   * Markup to wrap the table (printf suitable string)
+   *
+   * @access public
+   *
+   * @var $html_table_open
+   */
+  public $html_table_wrap = '<table class="table-calendar">%s</table>';
+
+  private $events_dates = array();
+  private $html = '';
+
+  /**
+   * Constructor, if array or object is passed, then initialize the object with vals.
+   *
+   * @param mixed
+   *
+   * @return Calendar
+   */
+  function __construct($config = array()) {
+
+    $config = do_hook( 'calendar_config', $config );
+
+    if ( $config ) {
+      foreach ( CAST_TO_ARRAY( $config ) as $key => $val ) {
+        if ( isset($this->{$key}) ) {
+          $this->{$key} = $val;
+        }
+      }
+    }
+    return $this;
+  }
+
+  /**
+   * Add event to the calendar.
+   *
+   * @access public
+   *
+   * @param string $date
+   *
+   * @return boolean
+   */
+  public function add_event($date = '', $text = '') {
+
+    if (is_array($date) || is_object($date)) {
+      foreach ( $date as $key => $val ) {
+        $this->add_event( $key, $val );
+      }
+    }
+    else {
+      $date = CAST_TO_STRING( $date );
+    }
+
+    if ( !$date ) {
+      return FALSE;
+    }
+
+    if ( !isset($this->events_dates[$date]) ) {
+      $this->events_dates[$date] = array();
+    }
+
+    $this->events_dates[$date][] = $text;
+
+    return TRUE;
+  }
+
+  /**
+   * Generate the calendar's html
+   *
+   * @access public
+   *
+   * @param date $YMD
+   *
+   * @return Calendar
+   */
+  public function generate($YMD = '') {
+
+    $this->html = '';
+
+    $YMD = explode('-', $YMD);
+
+    if (!$YMD[0]) {
+      $YMD[0] = date('Y');
+    }
+
+    if (!isset($YMD[1])) {
+      $YMD[1] = date('m');
+    }
+
+    if (!isset($YMD[2])) {
+      $YMD[2] = date('d');
+    }
+
+    $Y = str_pad( CAST_TO_INT( $YMD[0] ), 4, 0, STR_PAD_LEFT );
+    $M = str_pad( CAST_TO_INT( $YMD[1], 1, 12 ), 2, 0, STR_PAD_LEFT );
+    $D = str_pad( CAST_TO_INT( $YMD[2], 1, 31 ), 2, 0, STR_PAD_LEFT );
+
+    $day_weekday = date( 'w', mktime( 0, 0, 0, $M, 1, $Y ) );
+    if ( $day_weekday === 0 ) {
+      $day_weekday = 7;
+    }
+
+    $this->html .= '<tr>';
+
+    if ( $this->show_weekday_names) {
+      for ( $i = 0; $i < 7; $i++ ) {
+        $this->html .= '<th>' . $i . '</th>';
+      }
+      $this->html .= '</tr><tr>';
+    }
+
+    for ($i = 1; $i < ($this->first_is_monday ? $day_weekday : $day_weekday + 1); $i++) {
+      $this->html .= '<td class="hidden">&nbsp;</td>';
+    }
+
+    $month_days = date('t', mktime(0, 0, 0, $M, 1, $Y));
+
+    for ($i = 1; $i <= $month_days; $i++) {
+
+      $date = $Y . '-' . $M . '-' . $i;
+      $link = site_url(strftime($this->link_template, strtotime($date)));
+
+      if (isset($this->events_dates[$date])) {
+        $events = count($this->events_dates[$date]);
+      }
+      else {
+        $events = 0;
+      }
+
+      $title = $events ? sprintf(__('Events on this date - %d.'), $events) : __('There is no events on this date');
+
+      if ($this->link_all_days) {
+        $this->html .= '<td><a href="' . $link . '" title="' . $title . '">' . $i . '</a></td>';
+      }
+      elseif ($events) {
+        $this->html .='<td><a href="' . $link . '" title="' . $title . '">' . $i . '</a></td>';
+      }
+      else {
+        $this->html .='<td>' . $i . '</td>';
+      }
+
+      if ($this->first_is_monday) {
+        if ($day_weekday === 7) {
+          $this->html .= "</tr><tr>";
+          $day_weekday = 1;
+          continue;
+        }
+      }
+      else {
+        if ($day_weekday === 7) {
+          $day_weekday = 1;
+          continue;
+        }
+        elseif ($day_weekday === 6) {
+          $this->html .= '</tr><tr>';
+        }
+      }
+      $day_weekday++;
+    }
+
+    for (; $day_weekday <= ($this->first_is_monday ? 7 : 6); $day_weekday++) {
+      $this->html .= '<td>&nbsp;</td>';
+    }
+
+    $this->html .= '</tr>';
+
+    if ( strpos( $this->html_table_wrap, '%s' ) !== FALSE ) {
+      $this->html = sprintf( $this->html_table_wrap, $this->html );
+    }
+
+    return $this;
+  }
+
+  /**
+   * Output the generated calendar html.
+   *
+   * @access public
+   */
+  public function show() {
+    echo $this->html;
+  }
+
+  /**
+   * Return the generated calendar html.
+   *
+   * @access public
+   *
+   * @return string
+   */
+  public function get_html() {
+    return $this->html;
+  }
+
+}
+endif;
+
+if ( !class_exists( 'Pagination') ):
+/**
+ * Simple class for work with images.
+ */
+class Image {
+
+  /**
+   * Quality value of images (used in jpeg files)
+   *
+   * @var int
+   */
+  public $quality = 85;
+
+  private $im = NULL;
+
+  /**
+   * Load image for manipulation from existing file on the filesystem.
+   *
+   * @param string $filename
+   *
+   * @return boolean
+   */
+  function load_from_file($filename = '') {
+
+    if ( !$filename || !is_readable($filename) ) {
+      return FALSE;
+    }
+
+    if ( !($image_info = getimagesize( $filename )) ) {
+      return FALSE;
+    }
+
+    switch ($image_info['mime']) {
+      case 'image/gif':
+        if ( function_exists( 'imagecreatefromgif' ) && ( $this->im = imagecreatefromgif( $filename ) ) ) {
+          return TRUE;
+        }
+        break;
+
+      case 'image/jpeg':
+        if ( function_exists( 'imagecreatefromjpeg' ) && ( $this->im = imagecreatefromjpeg( $filename ) ) ) {
+          return TRUE;
+        }
+        break;
+
+      case 'image/png':
+        if ( function_exists( 'imagecreatefrompng' ) && ( $this->im = imagecreatefrompng( $filename ) ) ) {
+          return TRUE;
+        }
+        break;
+
+      case 'image/wbmp':
+        if ( function_exists( 'imagecreatefromwbmp' ) && ( $this->im = imagecreatefromwbmp( $filename ) ) ) {
+          return TRUE;
+        }
+        break;
+
+      case 'image/xbm':
+        if ( function_exists( 'imagecreatefromxbm' ) && ( $this->im = imagecreatefromxbm( $filename ) ) ) {
+          return TRUE;
+        }
+        break;
+
+      case 'image/xpm':
+        if ( function_exists( 'imagecreatefromxpm' ) && ( $this->im = imagecreatefromxpm( $filename ) ) ) {
+          return TRUE;
+        }
+        break;
+    }
+
+    $this->im = NULL;
+    return FALSE;
+  }
+
+  /**
+   * Load image for manipulation from a file content (string)
+   *
+   * @param string $content
+   *
+   * @return boolean
+   */
+  function load_from_string($content = '') {
+
+    if ( $content && is_string( $content ) && ($i = imagecreatefromstring( $content ) ) ) {
+      $this->im = $i;
+      return TRUE;
+    }
+    return FALSE;
+  }
+
+  /**
+   * Save current image into file.
+   *
+   * @param string $filename
+   *   output filepath
+   * @param int $quality
+   *   override the object quality with custom 0-100
+   * @param int $permissions
+   *
+   * @return boolean
+   */
+  function save_to_file($filename, $quality = FALSE, $permissions = NULL) {
+
+    if ( imagejpeg($this->im, $filename, ( $quality ? $quality : $this->quality)) ) {
+      if ($permissions !== NULL) {
+        chmod($filename, $permissions);
+      }
+      return TRUE;
+    }
+    return FALSE;
+  }
+
+  /**
+   * Get current image resource.
+   *
+   * @return resource
+   */
+  function image() {
+    return $this->im;
+  }
+
+  /**
+   * Get current image height
+   *
+   * @return int
+   */
+  function height() {
+    return imagesy( $this->im );
+  }
+
+  /**
+   * Get current image with.
+   *
+   * @return int
+   */
+  function width() {
+    return imagesx( $this->im );
+  }
+
+  /**
+   * Render the image directly.
+   *
+   * @param int $quality
+   * @param string $type
+   *   gif, jpeg, png
+   *
+   * @return boolean
+   */
+  function output($quality = FALSE, $type = 'jpeg', $send_header = TRUE) {
+
+    switch ($type) {
+      case 'gif' :
+        if ( imagegif($this->im, NULL) ) {
+          if ( $send_header ) {
+            @header( 'Content-type: image/gif' );
+          }
+          return TRUE;
+        }
+      case 'png' :
+        if ( imagepng($this->im, NULL, 8) ) {
+          if ( $send_header ) {
+            @header( 'Content-type: image/png' );
+          }
+          return TRUE;
+        }
+      default:
+        if ( imagejpeg($this->im, NULL, ($quality ? $quality : $this->quality) )) {
+          if ( $send_header ) {
+            @header( 'Content-type: image/jpeg' );
+          }
+          return TRUE;
+        }
+    }
+    return FALSE;
+  }
+
+  /**
+   * Get and return the output from output() method
+   *
+   * @param int $quality
+   * @param string $type
+   *
+   * @return string
+   */
+  function get_output($quality = FALSE, $type = 'jpeg') {
+    ob_start();
+    $this->output( $quality, $type, FALSE );
+    return ob_get_clean();
+  }
+
+  /**
+   * Interlance the current image.
+   *
+   * @return bool
+   */
+  function interlance() {
+    return (bool) imageinterlace( $this->im, TRUE );
+  }
+
+  /**
+   * Resize current image to match te specific height
+   *
+   * @param int $height
+   * @param bool $preserve_smaller
+   *
+   * @return bool
+   */
+  function resize_to_height($height, $preserve_smaller = TRUE) {
+    $ratio = $height / imagesy( $this->im );
+    $width = imagesx( $this->im ) * $ratio;
+    return $this->resize( $width, $height, $preserve_smaller );
+  }
+
+  /**
+   * Resize current image to specific with.
+   *
+   * @param int $width
+   * @param bool $preserve_smaller
+   *
+   * @return bool
+   */
+  function resize_to_width($width, $preserve_smaller = TRUE) {
+    $ratio = $width / imagesx( $this->im );
+    $height = imagesy( $this->im ) * $ratio;
+    return $this->resize ($width, $height, $preserve_smaller );
+  }
+
+  /**
+   * Resize current image to specific size, mean image will be
+   * no heigher and widther than this size.
+   *
+   * @param int $size
+   * @param bool $preserve_smaller
+   *
+   * @return bool
+   */
+  function resize_to($size, $preserve_smaller = TRUE) {
+
+    $width_orig = imagesx( $this->im );
+    $height_orig = imagesy( $this->im );
+
+    if ( $width_orig > $height_orig ) {
+      $ratio = $size / $width_orig;
+      $height = $height_orig * $ratio;
+      $width = $size;
+    }
+    else {
+      $ratio = $size / $height_orig;
+      $width = $width_orig * $ratio;
+      $height = $size;
+    }
+
+    return $this->resize( $width, $height, $preserve_smaller );
+  }
+
+  /**
+   * Resize image to absolute width and height.
+   *
+   * @param int $width
+   * @param int $height
+   * @param bool $preserve_smaller
+   *
+   * @return bool
+   */
+  function resize($width, $height, $preserve_smaller = TRUE) {
+
+    if ( $preserve_smaller ) {
+      $width_orig = imagesx( $this->im );
+      $height_orig = imagesy( $this->im );
+      if ( $width_orig < $width && $height_orig < $height ) {
+        return TRUE;
+      }
+    }
+
+    $image_new = imagecreatetruecolor( $width, $height );
+    return imagecopyresampled( $this->im, $this->im, 0, 0, 0, 0, $width, $height, imagesx( $this->im ), imagesy( $this->im ) );
+  }
+
+  /**
+   * Resize and crop current image.
+   *
+   * @param int $width
+   * @param int $height
+   * @param true $preserve_smaller
+   *
+   * @return bool
+   */
+  function resize_cropped($width, $height, $preserve_smaller = TRUE) {
+
+    $width_orig = imagesx( $this->im );
+    $height_orig = imagesy( $this->im );
+    $ratio_orig = $width_orig / $height_orig;
+
+    if ( $preserve_smaller ) {
+      $width_orig = imagesx( $this->im );
+      $height_orig = imagesy( $this->im );
+      if ( $width_orig < $width && $height_orig < $height ) {
+        return TRUE;
+      }
+    }
+
+    if ( $width / $height > $ratio_orig ) {
+      $new_height = $width / $ratio_orig;
+      $new_width = $width;
+    }
+    else {
+      $new_width = $height * $ratio_orig;
+      $new_height = $height;
+    }
+    $x_mid = $new_width / 2;
+    $y_mid = $new_height / 2;
+
+    $image_proccess = imagecreatetruecolor( round( $new_width ), round( $new_height ) );
+    imagecopyresampled( $image_proccess, $this->im, 0, 0, 0, 0, $new_width, $new_height, $width_orig, $height_orig );
+
+    $image_new = imagecreatetruecolor( $width, $height );
+    imagecopyresampled( $image_new, $image_proccess,
+        0, 0, ($x_mid - ($width / 2)), ($y_mid - ($height / 2)),
+        $width, $height, $width, $height);
+    imagedestroy( $image_proccess );
+
+    $this->im = $image_new;
+    imagedestroy( $image_new );
+    return TRUE;
+  }
+
+  /**
+   * Scale the current image.
+   *
+   * @param int $scale
+   * @param bool $preserve_smaller
+   *
+   * @return bool
+   */
+  function scale($scale = '100', $preserve_smaller = TRUE) {
+
+    $width = imagesx( $this->im ) * $scale / 100;
+    $height = imagesy( $this->im ) * $scale / 100;
+    return $this->resize( $width, $height, $preserve_smaller );
+  }
+
+  /**
+   * Rotate the current image.
+   *
+   * @param int $rotate
+   *
+   * @return bool
+   */
+  function rotate($rotate = 90) {
+
+    return (( $this->im = imagerotate($this->im, CAST_TO_INT($rotate), 0) ));
+  }
+
+  /**
+   * Add wattermark to the iamge.
+   *
+   * @param string $text
+   * @param int $fontsize
+   * @param string $font
+   *   path to TTF font for using
+   * @param string $position
+   *   TOP BOTTOM LEFT RIGHT
+   *
+   * @return bool
+   */
+  function wattermark_text($text = '', $fontsize = 18, $font = '', $position = 'RIGHT BOTTOM') {
+
+    $text = trim( CAST_TO_STRING( $text ));
+
+    if ( !$text ) {
+      return FALSE;
+    }
+
+    $fontsize = CAST_TO_INT( $fontsize, 1, 120 );
+
+    $black = imagecolorallocate( $this->im, 0, 0, 0 );
+
+    list( $pos[0], $post[1] ) = explode( ' ', $position );
+
+    if ( strpos( $position, 'LEFT' ) !== FALSE ) {
+      $mark_x = 10;
+    }
+    else {
+      $mark_x = imagesx( $this->im ) - 10 - strlen( $text ) * $fontsize;
+    }
+
+    if ( strpos($position, 'TOP') !== FALSE) {
+      $mark_y = 10;
+    }
+    else {
+      $mark_y = imagesy( $this->im ) - 10 - $fontsize;
+    }
+
+    return (bool) imagettftext( $this->im, $fontsize, 0, $mark_x, $mark_y, $black, $font, $text );
+
+  }
+
+  /**
+   * Add wattermark to the image.
+   *
+   * @param string $image
+   *   path to image that will be used for wattermark
+   * @param int $size
+   * @param string $position
+   *   TOP BOTTOM LEFT RIGHT
+   *
+   * @return bool
+   */
+  function wattermark_image($imagefile, $size = 0, $position = 'RIGHT BOTTOM') {
+
+    if ( !$imagefile ) {
+      return FALSE;
+    }
+
+    $wim = new Image;
+    if (!$wim->load_from_file( $imagefile )) {
+      return FALSE;
+    }
+
+    if ($size) {
+      $wim->resize_to( CAST_TO_INT( $size, 8, 640 ), TRUE );
+    }
+
+    $mark_w = $wim->width();
+    $mark_h = $wim->height();
+
+    if (strpos($position, 'LEFT') !== FALSE) {
+      $mark_x = 10;
+    }
+    else {
+      $mark_x = $this->width() - 10 - $mark_w;
+    }
+
+    if (strpos($position, 'TOP') !== FALSE) {
+      $mark_y = 10;
+    }
+    else {
+      $mark_y = $this->height() - 10 - $mark_h;
+    }
+
+    return (bool) imagecopy($this->im, $wim->image(), $mark_x, $mark_y, 0, 0, $mark_w, $mark_h);
+
+  }
+
+  /**
+   * Convert current image to ascii.
+   *
+   * @param bool $binary
+   *    create 1010 like ascii
+   *
+   * @return string
+   */
+  function to_ascii($binary = TRUE) {
+
+    $text = '';
+    $width = imagesx($this->im);
+    $height = imagesy($this->im);
+
+    for ($h = 1; $h < $height; $h++) {
+      for ($w = 1; $w <= $width; $w++) {
+        $rgb = imagecolorat($this->im, $w, $h);
+        $r = ($rgb >> 16) & 0xFF;
+        $g = ($rgb >> 8) & 0xFF;
+        $b = $rgb & 0xFF;
+        if ($binary) {
+          $hex = '#' . str_pad( dechex( $r ), 2, '0', STR_PAD_LEFT )
+          . str_pad( dechex( $g ), 2, '0', STR_PAD_LEFT )
+          . str_pad( dechex( $b ), 2, '0', STR_PAD_LEFT );
+          if ($w == $width) {
+            $text .= '<br />';
+          }
+          else {
+            $text .= '<span style="color:' . $hex . ';">#</span>';
+          }
+        }
+        else {
+          if ( $r + $g + $b > 382 ) {
+            $text .= '0';
+          }
+          else {
+            $text .= '1';
+          }
+        }
+      }
+    }
+    return $text;
+  }
+}
+endif;
+
+if ( !class_exists( 'Pagination') ):
+/**
+ * Simple pagination class
+ */
+class Pagination {
+
+  /**
+   * Current page
+   */
+  public $current_page = 1;
+
+  /**
+   * Total num of records to paginate
+   */
+  public $total_rows = 100;
+
+  /**
+   * How many per page to show
+   */
+  public $per_page = 20;
+
+  /**
+   * Base url, printf format
+   */
+  public $base_url = '';
+
+  /**
+   * How many cells to show
+   */
+  public $size = 10;
+
+  /**
+   * Format of normal cell (printf format)
+   */
+  public $html_cell_normal = '<a href="%s">%s</a>';
+
+  /**
+   * Format of active cell (printf format)
+   */
+  public $html_cell_active = '<a href="%s" class="active">%s</a>';
+
+  /**
+   * Format of first cell (printf format)
+   */
+  public $html_cell_first = '<a href="%s">&#8592;</a>';
+
+  /**
+   * Format of last cell (printf format)
+   */
+  public $html_cell_last = '<a href="%s">&#8594;</a>';
+
+  /**
+   * Format of wrapper (printf format)
+   */
+  public $html_wrapper = '<div class="pagination">%s</div>';
+
+  private $html = '';
+
+  /**
+   * Constructor, if array or object is passed, then initialize the object with vals.
+   *
+   * @param mixed
+   *
+   * @return Pagination
+   */
+  function __construct($config = array()) {
+
+    $config = do_hook( 'pagination_config', $config );
+
+    if ( $config ) {
+      foreach ( CAST_TO_ARRAY( $config ) as $key => $val ) {
+        if ( isset($this->{$key}) ) {
+          $this->{$key} = $val;
+        }
+      }
+    }
+    return $this;
+  }
+
+  /**
+   * Generate the paginator
+   *
+   * @return Pagination
+   */
+  public function generate() {
+
+    if ( $this->per_page >= $this->total_rows ) {
+      return FALSE;
+    }
+
+    $html = '';
+
+    $this->per_page = CAST_TO_INT($this->per_page, 1);
+
+    $page_num_last = ceil( $this->total_rows / $this->per_page );
+
+    if ( $this->current_page > $page_num_last ) {
+      $this->current_page = $page_num_last;
+    }
+    elseif ($this->current_page < 1) {
+      $this->current_page = 1;
+    }
+
+    $page_num_prev = $this->current_page > 1 ? $this->current_page - 1 : 1;
+    $page_num_next = $this->current_page < $page_num_last ? $this->current_page + 1 : $page_num_last;
+
+    if ( $this->size ) {
+      $half_size = floor($this->size / 2);
+
+      $even = $this->size % 2 ? 1 : 0;
+
+      $for_loops = $this->current_page + $half_size + $even;
+      $i = $this->current_page - $half_size + 1;
+
+      if ($this->current_page - $half_size < 1) {
+        $for_loops = $this->size;
+        $i = 1;
+      }
+
+      if ($for_loops > $page_num_last) {
+        $for_loops = $page_num_last;
+        $i = $page_num_last - $this->size + 1;
+      }
+
+      if ($i < 1) {
+        $i = 1;
+      }
+    }
+    else {
+      $for_loops = $page_num_last;
+      $i = 1;
+    }
+
+    if ( $this->current_page > 1 ) {
+      if ( $this->html_cell_first ) {
+        $html .= sprintf( $this->html_cell_first, site_url( sprintf( $this->base_url, 1 ) ) );
+      }
+    }
+
+    for ($s = 1; $i <= $for_loops; $i++, $s++) {
+      $uri = site_url( sprintf( $this->base_url, $i ) );
+
+      if ($this->current_page == $i) {
+        $html .= sprintf( $this->html_cell_active, $uri, $i );
+      }
+      else {
+        $html .= sprintf( $this->html_cell_normal, $uri, $i );
+      }
+    }
+
+    if ( $page_num_last > $this->current_page ) {
+      if ( $this->html_cell_last ) {
+        $html .= sprintf( $this->html_cell_last, site_url( sprintf( $this->base_url, $page_num_last ) ) );
+      }
+    }
+
+    if ( !$html ) {
+      return '';
+    }
+
+    if ( $this->html_wrapper ) {
+      $html = sprintf( $this->html_wrapper, $html );
+    }
+
+    $this->html = $html;
+
+    return $this;
+  }
+
+  /**
+   * Output the generated calendar html.
+   */
+  public function show() {
+    echo $this->html;
+  }
+
+  /**
+   * Return the generated calendar html.
+   *
+   * @return string
+   */
+  public function get_html() {
+    return $this->html;
+  }
+
+}
+endif;
+
+/**
+ * @} End of "defgroup framework classes".
+ */
+
+
+/**
  * @defgroup framework bootstrap
  * @{
  *
@@ -4690,7 +4714,7 @@ define( 'TI_FW_VERSION', '0.9.9.0' );
 // Start the timer.
 define( 'TI_TIMER_START', microtime( TRUE ) );
 
-// Check for PHP version.
+// Check for PHP version, minimum requirements needs PHP v5.2.0 to work fine.
 if ( version_compare( PHP_VERSION, '5.2.0', '<' ) ) {
   die( 'REQUIRE PHP >= 5.2.0' );
 }
@@ -4751,14 +4775,14 @@ if ( TI_DEBUG_MODE ) {
   error_reporting( E_ALL );
   ini_set( 'display_errors', 1 );
   ini_set( 'display_startup_errors', TRUE );
-  ini_set( 'log_errors', TRUE );
 }
 else {
   error_reporting( 0 );
   ini_set( 'display_errors', FALSE );
   ini_set( 'display_startup_errors', FALSE );
-  ini_set( 'log_errors', TRUE );
 }
+// Anyway, log all errors.
+ini_set( 'log_errors', TRUE );
 
 // Reset some of PHP's configurations.
 ini_set( 'mbstring.internal_encoding', 'UTF-8' );
@@ -4829,3 +4853,5 @@ do_hook( 'shutdown' );
 /**
  * @} End of "defgroup framework bootstrap".
  */
+
+return TRUE;
