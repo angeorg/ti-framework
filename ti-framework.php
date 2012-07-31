@@ -2198,11 +2198,11 @@ function do_hook($hook_name, $value = NULL) {
   ksort( $_HOOKS[$hook_name] );
 
   $args = func_get_args();
-  unset( $args[0] );
 
   foreach ( $_HOOKS[$hook_name] as $hook_priority ) {
     foreach ( $hook_priority as $hook ) {
       if ( is_callable( $hook ) ) {
+        $args[0] = $value;
         $value = call_user_func_array($hook, $args);
       }
     }
@@ -3276,7 +3276,13 @@ class Application {
   /**
    * Load URL and process it.
    *
-   * @fire application_load_url
+   *  add_hook( 'url_rewrites', function($rules) {
+   *    $rules['create-new'] = 'users/0/create';
+   *    $rules['edit-user-(.+)'] = 'users/$1/edit';
+   *    return $rules;
+   *  });
+   *
+   * @fire url_rewrites
    *
    * @access public
    *
@@ -3290,60 +3296,51 @@ class Application {
 
     $this->arguments = array();
 
-    $url = do_hook( 'application_load_url', $url );
+    foreach ( do_hook( 'url_rewrites', array() ) as $rule => $rurl ) {
+      if ( preg_match( '#^\/' . $rule . '$#i', $url ) ) {
+        $url = preg_replace( '#^\/' . $rule . '$#i', $rurl, $url );
+        break;
+      }
+    }
 
     // Protect private controllers.
     if (self::$is_main && preg_match( '#\/(\_|\.)#', $url ) ) {
       show_404();
     }
 
+    // Handle when url exists on a controllers folder as is.
     if ( is_readable( TI_PATH_APP . '/' . TI_FOLDER_CONTROLLER . $url . TI_EXT_CONTROLLER )) {
       self::$is_main = FALSE;
-      $rule = $url;
-      unset( $url );
-      include( TI_PATH_APP . '/' . TI_FOLDER_CONTROLLER . $rule . TI_EXT_CONTROLLER );
+      include( TI_PATH_APP . '/' . TI_FOLDER_CONTROLLER . $url . TI_EXT_CONTROLLER );
       if ( TI_AUTORENDER ) {
-        $this->render( $rule );
+        $this->render( $url );
       }
       return TRUE;
     }
 
-    $rules = _ti_application_routes();
+    // Handle when arguments need to be passed.
+    $url_segments = explode( '/', ltrim( $url, '/' ) );
 
-    foreach ( $rules as $rule ) {
-      if ( !$rule ) {
-        continue;
-      }
-      $pattern = strtr( preg_quote( $rule ), array('%s' => '([^\/]+)', '%d' => '([0-9]+)')) . '(?:\/(.*))?';
-      if ( preg_match( '#^' . $pattern . '$#i', $url, $this->arguments )
-          || preg_match( '#^' . $pattern . '$#i', $url . '/index', $this->arguments ) ) {
-
-        unset( $this->arguments[0] );
-        $this->arguments = explode( '/', implode( '/', $this->arguments ) );
-        // Is it correct to strip duplicated / (slashes), maybe sometimes they are placed correctly?!
-        // $this->arguments = array_filter( $this->arguments );
-
-        self::$is_main = FALSE;
-        unset( $rules, $url, $pattern );
-
-        // Checking for controller or controller directory (index.php alike)
-        if ( is_readable( TI_PATH_APP . '/' . TI_FOLDER_CONTROLLER . $rule . TI_EXT_CONTROLLER ) ) {
-          include( TI_PATH_APP . '/' . TI_FOLDER_CONTROLLER . $rule . TI_EXT_CONTROLLER );
-        }
-        elseif ( is_readable( TI_PATH_APP . '/' . TI_FOLDER_CONTROLLER . $rule . '/index' . TI_EXT_CONTROLLER )) {
-          include( TI_PATH_APP . '/' . TI_FOLDER_CONTROLLER . $rule . '/index' . TI_EXT_CONTROLLER );
-        }
-        else {
-          // Switch back to $url.
-          $url = $rule;
-          break;
-        }
+    foreach ( $url_segments as $segment ) {
+      $url = implode( '/', $url_segments );
+      if ( is_readable( TI_PATH_APP . '/' . TI_FOLDER_CONTROLLER . '/' . $url . TI_EXT_CONTROLLER ) ) {
+        include( TI_PATH_APP . '/' . TI_FOLDER_CONTROLLER . '/' . $url . TI_EXT_CONTROLLER );
         if ( TI_AUTORENDER ) {
-          $this->render( $rule );
+          $this->render( $url );
         }
         return TRUE;
       }
+      // Fallback to index
+      elseif ( is_readable( TI_PATH_APP . '/' . TI_FOLDER_CONTROLLER . '/' . $url . '/index' . TI_EXT_CONTROLLER ) ) {
+        include( TI_PATH_APP . '/' . TI_FOLDER_CONTROLLER . '/' . $url . '/index' . TI_EXT_CONTROLLER );
+        if ( TI_AUTORENDER ) {
+          $this->render( $url );
+        }
+        return TRUE;
+      }
+      array_unshift( $this->arguments, array_pop( $url_segments ) );
     }
+
     if ( self::$is_main ) {
       show_404();
     }
@@ -3386,13 +3383,22 @@ class Application {
   }
 
   /**
+   * Get all arguments.
+   *
+   * @return array
+   */
+  public function args() {
+    return $this->arguments;
+  }
+
+  /**
    * Get all shared variables.
    *
    * @access public
    *
    * @return array
    */
-  public function get_vars() {
+  public function vars() {
     return self::$variables;
   }
 

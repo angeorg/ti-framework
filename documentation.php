@@ -31,7 +31,7 @@
  * USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-  $functions_file = file( TI_PATH_FRAMEWORK . '/functions.php');
+  $functions_file = file( __FILE__ );
   $functions = get_defined_functions();
   $functions = $functions['user'];
 
