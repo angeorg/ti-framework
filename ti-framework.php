@@ -1,7 +1,7 @@
 <?php
 
 /**
- * ti-framework.php - the framework code
+ * ti-framework.php - The complete framework's code.
  *
  * Copyright (c) 2010, e01 <dimitrov.adrian@gmail.com>
  * All rights reserved.
