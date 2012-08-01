@@ -2437,6 +2437,131 @@ function strip_attributes($html = '') {
 }
 
 /**
+ * Build HTML paginate links for page.
+ *
+ * <?php
+ *   // Example simple ussage:
+ *   echo paginate( $page, $entries->getTotal(), 'articles/page/%s' );
+ * ?>
+ *
+ * @fire paginate
+ * @fire paginate_$id
+ *
+ * @param int $page_no
+ *   current page number
+ * @param int $entries
+ *   total number of entries
+ * @param string $base_url
+ *   url to be used
+ * @param bool $echo
+ *   return or echo the generated html
+ * @param string $id
+ *   used only when need to customize,
+ *   specific paginate section by this id and hook paginate
+ *
+ * @return null|string
+ */
+function paginate($page_no, $entries, $base_url = '', $echo = TRUE, $id = '') {
+
+  $conf = new stdClass;
+  $conf->size = 10;
+  $conf->per_page = 20;
+  $conf->html_cell_normal = '<a href="%s">%s</a>';
+  $conf->html_cell_active = '<a href="%s" class="active">%s</a>';
+  $conf->html_cell_first = '<a href="%s">&#8592;</a>';
+  $conf->html_cell_last = '<a href="%s">&#8594;</a>';
+  $conf->html_wrapper = '<div class="pagination">%s</div>';
+
+  $hook_name = 'paginate' . ( $id ? '_' . $id : '' );
+  $conf = do_hook( $hook_name, $conf );
+
+  if ( $conf->per_page >= $entries ) {
+    return FALSE;
+  }
+
+  $html = '';
+
+  $conf->per_page = CAST_TO_INT( $conf->per_page, 1 );
+
+  $page_num_last = ceil( $entries / $conf->per_page );
+
+  if ( $page_no > $page_num_last ) {
+    $page_no = $page_num_last;
+  }
+  elseif ( $page_no < 1 ) {
+    $page_no = 1;
+  }
+
+  $page_num_prev = $page_no > 1 ? $page_no - 1 : 1;
+  $page_num_next = $page_no < $page_num_last ? $page_no + 1 : $page_num_last;
+
+  if ( $conf->size ) {
+    $half_size = floor( $conf->size / 2 );
+
+    $even = $this->size % 2 ? 1 : 0;
+
+    $for_loops = $page_no + $half_size + $even;
+    $i = $page_no - $half_size + 1;
+
+    if ( $page_no - $half_size < 1 ) {
+      $for_loops = $conf->size;
+      $i = 1;
+    }
+
+    if ( $for_loops > $page_num_last ) {
+      $for_loops = $page_num_last;
+      $i = $page_num_last - $conf->size + 1;
+    }
+
+    if ($i < 1) {
+      $i = 1;
+    }
+  }
+  else {
+    $for_loops = $page_num_last;
+    $i = 1;
+  }
+
+  if ( $page_no > 1 ) {
+    if ( $conf->html_cell_first ) {
+      $html .= sprintf( $conf->html_cell_first, site_url( sprintf( $base_url, 1 ) ) );
+    }
+  }
+
+  for ( $s = 1; $i <= $for_loops; $i++, $s++ ) {
+    $uri = site_url( sprintf( $base_url, $i ) );
+
+    if ( $page_no == $i) {
+      $html .= sprintf( $conf->html_cell_active, $uri, $i );
+    }
+    else {
+      $html .= sprintf( $conf->html_cell_normal, $uri, $i );
+    }
+  }
+
+  if ( $page_num_last > $page_no ) {
+    if ( $conf->html_cell_last ) {
+      $html .= sprintf( $conf->html_cell_last, site_url( sprintf( $base_url, $page_num_last ) ) );
+    }
+  }
+
+  if ( !$html ) {
+    return '';
+  }
+
+  if ( $conf->html_wrapper ) {
+    $html = sprintf( $conf->html_wrapper, $html );
+  }
+
+  if ( $echo ) {
+    echo $html;
+  }
+  else {
+    return $html;
+  }
+}
+
+/**
  * Evalute php
  *
  * @param string $string
@@ -3054,8 +3179,9 @@ function dec_to_roman($decimal = 0) {
   $result = '';
 
   $romanians = array(
-      'M' => 1000, 'CM' => 900, 'D' => 500, 'CD' => 400, 'C' => 100, 'XC' => 90,
-      'L' => 50, 'XL' => 40, 'X' => 10, 'IX' => 9, 'V' => 5, 'IV' => 4, 'I' => 1);
+    'M' => 1000, 'CM' => 900, 'D' => 500, 'CD' => 400, 'C' => 100, 'XC' => 90,
+    'L' => 50, 'XL' => 40, 'X' => 10, 'IX' => 9, 'V' => 5, 'IV' => 4, 'I' => 1
+  );
 
   foreach ( $romanians as $key => $val ) {
     $result .= str_repeat( $key, $decimal / $val );
@@ -3091,8 +3217,8 @@ function num_to_month($num = 0, $long_names = FALSE) {
  */
 function sql_now($timestamp = 0) {
   return !$timestamp
-  ? date( 'Y-m-d H:i:s' )
-  : date( 'Y-m-d H:i:s', $timestamp );
+   ? date( 'Y-m-d H:i:s' )
+   : date( 'Y-m-d H:i:s', $timestamp );
 }
 
 /**
@@ -3243,10 +3369,10 @@ function transliterate($string = '', $from_latin = FALSE) {
  * Define classes Application, Messagebus, Database, Calendar, Image, Pagination
  */
 
-if ( !class_exists( 'Application') ):
 /**
  * Main Application class, provide a flexible MVC alike separation.
-*/
+ */
+if ( !class_exists( 'Application') ):
 class Application {
 
   static private $is_main = TRUE;
@@ -3436,10 +3562,10 @@ class Application {
 }
 endif;
 
-if ( !class_exists( 'Database') ):
 /**
  * Database wraper class for PDO
-*/
+ */
+if ( !class_exists( 'Database') ):
 class Database extends PDO {
 
   /**
@@ -3706,10 +3832,10 @@ class Database extends PDO {
 }
 endif;
 
-if ( !class_exists( 'Messagebus') ):
 /**
  * Messagebus class.
-*/
+ */
+if ( !class_exists( 'Messagebus') ):
 class Messagebus {
 
   /**
@@ -3786,10 +3912,10 @@ class Messagebus {
 }
 endif;
 
-if ( !class_exists( 'Calendar') ):
 /**
  * Calendar based events.
-*/
+ */
+if ( !class_exists( 'Calendar') ):
 class Calendar {
 
   /**
@@ -4024,7 +4150,7 @@ class Calendar {
 }
 endif;
 
-if ( !class_exists( 'Pagination') ):
+if ( !class_exists( 'Image') ):
 /**
  * Simple class for work with images.
 */
@@ -4513,131 +4639,6 @@ class Image {
   }
 }
 endif;
-
-/**
- * Build HTML paginate links for page.
- *
- * <?php
- *   // Example simple ussage:
- *   echo paginate( $page, $entries->getTotal(), 'articles/page/%s' );
- * ?>
- *
- * @fire paginate
- * @fire paginate_$id
- *
- * @param int $page_no
- *   current page number
- * @param int $entries
- *   total number of entries
- * @param string $base_url
- *   url to be used
- * @param bool $echo
- *   return or echo the generated html
- * @param string $id
- *   used only when need to customize,
- *   specific paginate section by this id and hook paginate
- *
- * @return null|string
- */
-function paginate($page_no, $entries, $base_url = '', $echo = TRUE, $id = '') {
-
-  $conf = new stdClass;
-  $conf->size = 10;
-  $conf->per_page = 20;
-  $conf->html_cell_normal = '<a href="%s">%s</a>';
-  $conf->html_cell_active = '<a href="%s" class="active">%s</a>';
-  $conf->html_cell_first = '<a href="%s">&#8592;</a>';
-  $conf->html_cell_last = '<a href="%s">&#8594;</a>';
-  $conf->html_wrapper = '<div class="pagination">%s</div>';
-
-  $hook_name = 'paginate' . ( $id ? '_' . $id : '' );
-  $conf = do_hook( $hook_name, $conf );
-
-  if ( $conf->per_page >= $entries ) {
-    return FALSE;
-  }
-
-  $html = '';
-
-  $conf->per_page = CAST_TO_INT( $conf->per_page, 1 );
-
-  $page_num_last = ceil( $entries / $conf->per_page );
-
-  if ( $page_no > $page_num_last ) {
-    $page_no = $page_num_last;
-  }
-  elseif ( $page_no < 1 ) {
-    $page_no = 1;
-  }
-
-  $page_num_prev = $page_no > 1 ? $page_no - 1 : 1;
-  $page_num_next = $page_no < $page_num_last ? $page_no + 1 : $page_num_last;
-
-  if ( $conf->size ) {
-    $half_size = floor( $conf->size / 2 );
-
-    $even = $this->size % 2 ? 1 : 0;
-
-    $for_loops = $page_no + $half_size + $even;
-    $i = $page_no - $half_size + 1;
-
-    if ( $page_no - $half_size < 1 ) {
-      $for_loops = $conf->size;
-      $i = 1;
-    }
-
-    if ( $for_loops > $page_num_last ) {
-      $for_loops = $page_num_last;
-      $i = $page_num_last - $conf->size + 1;
-    }
-
-    if ($i < 1) {
-      $i = 1;
-    }
-  }
-  else {
-    $for_loops = $page_num_last;
-    $i = 1;
-  }
-
-  if ( $page_no > 1 ) {
-    if ( $conf->html_cell_first ) {
-      $html .= sprintf( $conf->html_cell_first, site_url( sprintf( $base_url, 1 ) ) );
-    }
-  }
-
-  for ( $s = 1; $i <= $for_loops; $i++, $s++ ) {
-    $uri = site_url( sprintf( $base_url, $i ) );
-
-    if ( $page_no == $i) {
-      $html .= sprintf( $conf->html_cell_active, $uri, $i );
-    }
-    else {
-      $html .= sprintf( $conf->html_cell_normal, $uri, $i );
-    }
-  }
-
-  if ( $page_num_last > $page_no ) {
-    if ( $conf->html_cell_last ) {
-      $html .= sprintf( $conf->html_cell_last, site_url( sprintf( $base_url, $page_num_last ) ) );
-    }
-  }
-
-  if ( !$html ) {
-    return '';
-  }
-
-  if ( $conf->html_wrapper ) {
-    $html = sprintf( $conf->html_wrapper, $html );
-  }
-
-  if ( $echo ) {
-    echo $html;
-  }
-  else {
-    return $html;
-  }
-}
 
 /**
  * @} End of "defgroup framework classes".
