@@ -801,7 +801,6 @@ function _e($string = '') {
  * @return string
  */
 function _n($string_single = '', $string_plural = '', $number = 1) {
-  global $_LOCALE;
   return $number === 1 ? __( $string_single ) : __( $string_plural );
 }
 
@@ -2492,8 +2491,8 @@ function paginate($page_no, $entries, $base_url = '', $echo = TRUE, $id = '') {
     $page_no = 1;
   }
 
-  $page_num_prev = $page_no > 1 ? $page_no - 1 : 1;
-  $page_num_next = $page_no < $page_num_last ? $page_no + 1 : $page_num_last;
+  $conf->page_num_prev = $page_no > 1 ? $page_no - 1 : 1;
+  $conf->page_num_next = $page_no < $page_num_last ? $page_no + 1 : $page_num_last;
 
   if ( $conf->size ) {
     $half_size = floor( $conf->size / 2 );
@@ -2883,7 +2882,7 @@ function human_time_diff( $from, $to = '' ) {
  */
 function alternator() {
 
-  static $i;
+  static $i = 0;
 
   if ( func_num_args() == 0 ) {
     $i = 0;
@@ -3738,6 +3737,7 @@ class Database extends PDO {
    */
   function delete($table = '', $condition = array()) {
 
+    $args = array();
     if ( is_string( $condition ) ) {
       $cond_str = $condition;
     }
@@ -3767,6 +3767,7 @@ class Database extends PDO {
    */
   function update($table = '', $elements = array(), $condition = array()) {
 
+    $args = array();
     $set_str = $this->build_keypair_clause($elements, $args, 'SET', ',');
 
     if ($set_str) {
@@ -4425,7 +4426,11 @@ class Image {
     }
 
     $image_new = imagecreatetruecolor( $width, $height );
-    return imagecopyresampled( $this->im, $this->im, 0, 0, 0, 0, $width, $height, imagesx( $this->im ), imagesy( $this->im ) );
+    $state = imagecopyresampled( $image_new, $this->im, 0, 0, 0, 0, $width, $height, imagesx( $this->im ), imagesy( $this->im ) );
+    if ( $state) {
+      $this->im = $image_new;
+    }
+    return $state;
   }
 
   /**
@@ -4526,8 +4531,6 @@ class Image {
     $fontsize = CAST_TO_INT( $fontsize, 1, 120 );
 
     $black = imagecolorallocate( $this->im, 0, 0, 0 );
-
-    list( $pos[0], $post[1] ) = explode( ' ', $position );
 
     if ( strpos( $position, 'LEFT' ) !== FALSE ) {
       $mark_x = 10;
