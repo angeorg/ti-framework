@@ -567,7 +567,7 @@ function untrailingslashit($string) {
  *   destination url or current url
  * @param int $time_to_wait
  *   time to wait before redirect
- * 
+ *
  * @return void
  */
 function redirect($url = NULL, $time_to_wait = 0) {
