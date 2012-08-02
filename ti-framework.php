@@ -45,6 +45,8 @@
  *
  * @thanks WordPress
  *
+ * @access private
+ *
  * @return void
  */
 function _ti_fix_server_vars() {
@@ -125,6 +127,8 @@ function _ti_fix_server_vars() {
 /**
  * Wrapper for session_start() used from ti-framework bootstrap
  *
+ * @access private
+ *
  * @return void
  */
 function _ti_session_start() {
@@ -142,67 +146,6 @@ function _ti_session_start() {
 }
 
 /**
- * Find all routes in the application from controller folder.
- *
- * @access private
- *
- * @param string $adir
- * @param string $rdir
- *
- * @return array
- */
-function _ti_application_find_routes_fd($adir, $rdir = '') {
-  $files = array();
-  if ( is_dir( $adir ) ) {
-    $handle = opendir( $adir );
-    if ( $handle ) {
-      while ( FALSE !== ($file = readdir( $handle )) ) {
-        if ( $file{0} !== '.' ) {
-          if ( is_dir( $adir . '/' . $file ) ) {
-            $files = array_merge( $files, _ti_application_find_routes_fd( $adir . '/' . $file, $rdir . '/' . $file ) );
-          }
-          elseif ( substr( $file, TI_EXT_CONTROLLER_N ) === TI_EXT_CONTROLLER ) {
-            $files[] = $rdir . '/' . substr( $file, 0, TI_EXT_CONTROLLER_N );
-          }
-        }
-      }
-      closedir($handle);
-    }
-  }
-  return $files;
-}
-
-/**
- * Get all routes in the application
- *
- * @fire application_routes
- *
- * @access private
- *
- * @return array
- */
-function _ti_application_routes() {
-
-  static $routes = NULL;
-
-  if ( $routes === NULL ) {
-
-    if ( TI_RULES_CACHE && cache_exists( 'ti://rules-cache', TI_RULES_CACHE )) {
-      $routes = explode( NL, cache_get( 'ti://rules-cache', TI_RULES_CACHE ) );
-    }
-    else {
-      $routes = _ti_application_find_routes_fd( TI_PATH_APP . '/' . TI_FOLDER_CONTROLLER );
-      asort( $routes );
-      if ( TI_RULES_CACHE ) {
-        cache_put( 'ti://rules-cache', implode( NL, $routes ) );
-      }
-    }
-  }
-
-  return do_hook( 'application_routes', $routes );
-}
-
-/**
  * Load URL when define new object of Application with parameters.
  *
  * @see Application->load().
@@ -213,7 +156,7 @@ function _ti_application_routes() {
  * @return Application
  */
 function Application($url = '', $return = FALSE) {
-  $app = new Application( $url, $return );
+  $app = new TI_Application( $url, $return );
   return $app;
 }
 
@@ -231,7 +174,7 @@ function mbus($text = '') {
 
   static $mbus = NULL;
   if ($mbus === NULL) {
-    $mbus = new Messagebus;
+    $mbus = new TI_Messagebus;
   }
   $text = trim($text);
   if (!empty($text)) {
@@ -284,8 +227,8 @@ function db($db_id = '') {
 
   static $databases = array();
 
-  if ( !defined('TI_DB' . $db_id) ) {
-    show_error('System error', 'Database <strong>' . $db_id . '</strong> not configured.');
+  if ( !defined( 'TI_DB' . $db_id ) ) {
+    show_error( 'System error', 'Database <strong>' . $db_id . '</strong> not configured.' );
     return NULL;
   }
 
@@ -295,14 +238,14 @@ function db($db_id = '') {
     return $databases[$hash];
   }
 
-  if ( !extension_loaded('PDO') ) {
-    show_error('System error', 'Database PDO extension not available.');
+  if ( !extension_loaded( 'PDO' ) ) {
+    show_error( 'System error', 'Database PDO extension not available.' );
     return NULL;
   }
 
   $dburi = constant( 'TI_DB' . $db_id );
 
-  parse_str( str_replace(';', '&', $dburi), $cred );
+  parse_str( str_replace( ';', '&', $dburi ), $cred );
 
   $username = ifsetor( $cred['username'] );
   $password = ifsetor( $cred['password'] );
@@ -312,8 +255,8 @@ function db($db_id = '') {
   $dsn = http_build_query( $cred, NULL, ';' );
   $dsn = urldecode( $dsn );
 
-  foreach (PDO::getAvailableDrivers() as $driver) {
-    if (isset($cred[$driver . ':dbname'])) {
+  foreach ( PDO::getAvailableDrivers() as $driver ) {
+    if ( isset( $cred[$driver . ':dbname'] )) {
       try {
         $options = array();
         if ($driver == 'mysql' && version_compare(PHP_VERSION, '5.3.6', '<=')
@@ -321,17 +264,17 @@ function db($db_id = '') {
           $options[PDO::MYSQL_ATTR_INIT_COMMAND] = 'SET NAMES ' . $cred['charset'];
         }
         $options = do_hook( 'pdo_options', $options, $cred, $driver );
-        $databases[$hash] = new Database( $dsn, $username, $password, $options );
+        $databases[$hash] = new TI_Database( $dsn, $username, $password, $options );
         $databases[$hash]->prefix = $prefix;
         return $databases[$hash];
       }
       catch ( PDOException $e ) {
-        show_error('System error', 'Can\'t connect to database. <br >' . $e->getMessage());
+        show_error( 'System error', 'Can\'t connect to database. <br />' . $e->getMessage() );
       }
     }
   }
 
-  show_error('System error', 'Database driver not found.');
+  show_error( 'System error', 'Database driver not found.' );
   return NULL;
 }
 
@@ -503,11 +446,13 @@ function match_url($pattern = '') {
  * @fire site_url
  *
  * @param string $url
+ * @param bool $fullpath
+ *   return URI (protocol://host/path)
  *
  * @return string
  *   complete url
  */
-function site_url($url = '') {
+function site_url($url = '', $fullpath = FALSE) {
 
   if ( func_num_args() > 1 ) {
     $url = func_get_args();
@@ -519,11 +464,41 @@ function site_url($url = '') {
 
   $url = preg_replace( '#\/{2,}#', '/', $url );
 
-  $url = trailingslashit( TI_PATH_WEB ) .
-  ( TI_DISABLE_MOD_REWRITE ? '?' : '' ) .
-  trim( $url, '/' ) . '/';
+  // Trim slashes.
+  $url = trim( $url, '/' );
+
+  // If the filename contain dot (.) then seems to be file.
+  if ( !pathinfo( $url, PATHINFO_EXTENSION ) ) {
+    $url .= '/';
+  }
+
+  $url = base_url() . ( TI_DISABLE_MOD_REWRITE ? '?' : '' ) . $url;
 
   return do_hook( 'site_url', $url );
+}
+
+/**
+ * Prepend protocol, host and eventually port for internal url.
+ *
+ * <?php
+ *   echo site_url_external(site_url( 'path/to/admin/panel' ));
+ *   // http://example.com:8081/path/to/admin/panel/
+ * ?>
+ *
+ * @param string $url
+ *
+ * @return string
+ */
+function site_url_external($url = '') {
+  $url_pre = 'http';
+  if ( !empty( $_SERVER['HTTPS'] ) ) {
+    $url_pre .= 's';
+  }
+  $url_pre .= '://' . $_SERVER['SERVER_NAME'];
+  if ( $_SERVER['SERVER_PORT'] != 80 ) {
+    $url_pre .= ':' . $_SERVER['SERVER_PORT'];
+  }
+  return $url_pre . $url;
 }
 
 /**
@@ -532,19 +507,16 @@ function site_url($url = '') {
  * @return string
  */
 function current_url() {
-  return site_url( $_SERVER['REQUEST_URI'] );
+  return trailingslashit( $_SERVER['REQUEST_URI'] );
 }
 
 /**
- * Get the base url for application, it is always trailingslash,
- * because the requirement for TI_PATH_WEB
- *
- * @param string library name
+ * Get the base url for application, it is always trailingslash
  *
  * @return string
  */
 function base_url() {
-  return trailingslashit( TI_PATH_WEB );
+  return trailingslashit( pathinfo( $_SERVER['PHP_SELF'], PATHINFO_DIRNAME ) );
 }
 
 /**
@@ -595,6 +567,8 @@ function untrailingslashit($string) {
  *   destination url or current url
  * @param int $time_to_wait
  *   time to wait before redirect
+ * 
+ * @return void
  */
 function redirect($url = NULL, $time_to_wait = 0) {
 
@@ -654,17 +628,13 @@ function po_to_array($file = '') {
   $file = CAST_TO_STRING( $file );
 
   if ( is_readable( $file ) ) {
-
     $is_msgid = FALSE;
     $last_msgid = '';
     $array = array();
-
     foreach ( file( $file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES ) as $line ) {
-
       if ( $line{0} == '#' ) {
         continue;
       }
-
       if ( strpos($line, 'msgid  ') === 0 ) {
         $last_msgid = trim(substr($line, 6), '" ');
         $is_msgid = TRUE;
@@ -1464,6 +1434,9 @@ function array_get_by_path($path = '/', $array = array()) {
  *   echo array_match_first( 'is_email', array('x', 'test', 'ti'), 'a123@example.com' );
  *   // a123@example.com
  *
+ *   echo array_match_first( 'is_numeric', array( 'x', 'a1', 2, 3 ), 1 );
+ *   // 2
+ *
  * @param callable $callback
  * @param array $array
  *
@@ -1529,9 +1502,7 @@ function implode_r($glue = '', $pieces = array()) {
 function explode_n($delimeter = ',', $string = '', $elements_number = 1, $default_value = NULL) {
 
   $elements_number = CAST_TO_INT( $elements_number, 1 );
-
   $array = explode( $delimeter, $string, ( $elements_number ? $elements_number : NULL ));
-
   if ( !$array ) {
     return array_fill( 0, $elements_number, $default_value );
   }
@@ -1854,7 +1825,7 @@ function http_query($url, $method = 'GET', $data = NULL, $timeout = 30) {
  *
  * @return bool
  */
-function is_writable_real( $filename = '') {
+function is_writable_real($filename = '') {
 
   if ( file_exists( $filename ) ) {
     return is_writable( $filename );
@@ -1877,11 +1848,9 @@ function is_writable_real( $filename = '') {
  * @return string
  */
 function make_hash($string = '') {
-
   if ( !$string ) {
     return '';
   }
-
   return md5( TI_APP_SECRET . str_rot13( CAST_TO_STRING( $string ) ) );
 }
 
@@ -1899,10 +1868,9 @@ function hmacsha1($key = '', $data = '') {
   $hashfunc = 'sha1';
 
   if ( strlen($key) > $blocksize ) {
-    $key=pack( 'H*', $hashfunc($key) );
+    $key = pack( 'H*', $hashfunc($key) );
   }
-
-  $key=str_pad( $key, $blocksize,chr( 0x00 ) );
+  $key = str_pad( $key, $blocksize,chr( 0x00 ) );
   $ipad = str_repeat( chr( 0x36 ), $blocksize );
   $opad = str_repeat( chr( 0x5c ), $blocksize );
   $hmac = pack( 'H*', $hashfunc( ($key^$opad) . pack( 'H*', $hashfunc( ($key^$ipad) . $data ) ) ) );
@@ -1924,13 +1892,11 @@ function fileupload_get_size_limit() {
   }
 
   $x = array(
-      (int) ini_get( 'upload_max_filesize' ),
-      (int) ini_get( 'post_max_size' ),
-      (int) ini_get( 'memory_limit' ),
+    (int) ini_get( 'upload_max_filesize' ),
+    (int) ini_get( 'post_max_size' ),
+    (int) ini_get( 'memory_limit' ),
   );
-
   $x = array_filter($x);
-
   return min($x) * 1048576;
 }
 
@@ -2224,9 +2190,7 @@ function delete_hook($hook_name) {
   }
 
   global $_HOOKS;
-
   $_HOOKS[$hook_name] = array();
-
   return TRUE;
 }
 
@@ -2605,7 +2569,7 @@ function evalute_math( $string = '', &$sanitized_string = '' ) {
   $string = strtr( $string, array('\\' => '/', ',' => '.', 'x' => '*'));
 
   // Replace all except numbers and math signs with empty.
-  $string = preg_replace( '#[^0-9\.\+\-\/\*\(\)]#', '', $string );
+  $string = preg_replace( '#[^0-9\.\+\-\/\*\(\)]#', '0', $string );
 
   $string = trim( $string );
   $string = trim( $string, '*/' );
@@ -2641,10 +2605,10 @@ function evalute_math( $string = '', &$sanitized_string = '' ) {
   // Autoclosing missed cloed brackets.
   $bracket_c = substr_count( $string, ')' );
   $bracket_o = substr_count( $string, '(' );
-  if ($bracket_c > $bracket_o) {
+  if ( $bracket_c > $bracket_o ) {
     $string = str_repeat( '(', $bracket_c-$bracket_o ) . $string;
   }
-  elseif ($bracket_c < $bracket_o) {
+  elseif ( $bracket_c < $bracket_o ) {
     $string = $string . str_repeat(')', $bracket_o-$bracket_c);
   }
 
@@ -2652,19 +2616,11 @@ function evalute_math( $string = '', &$sanitized_string = '' ) {
       create_function( '$matches', 'return (float) $matches[0];' ),
       $string );
 
-  $sanitized_string = $string;
-
-  $string = 'return ' . $string . ';';
-
   // Evalute the sanitized math expression.
-  $fx = create_function( '$string', 'return ' . $string . ';' );
-  $x = $fx( $string );
+  $fx = @create_function( '$string', 'return ' . $string . ';' );
+  $x = @$fx( $string );
 
-  if ( is_numeric($x) ) {
-    return (double) $x;
-  }
-
-  return FALSE;
+  return is_numeric($x) ? (double) $x : FALSE;
 }
 
 /**
@@ -2688,8 +2644,8 @@ function evalute_math( $string = '', &$sanitized_string = '' ) {
  */
 function is_123_set($string = '', $min = 0, $max = NULL) {
   return preg_match('/^[0-9]+(\s{0,1}\,\s{0,1}[0-9]+){' .
-      ( $min ? intval( $min ) - 1 : 0) . ',' .
-      ( $max ? intval( $max ) - 1 : NULL) . '}$/', CAST_TO_STRING( $string ) ) ? TRUE : FALSE;
+    ( $min ? intval( $min ) - 1 : 0) . ',' .
+    ( $max ? intval( $max ) - 1 : NULL) . '}$/', CAST_TO_STRING( $string ) ) ? TRUE : FALSE;
 }
 
 /**
@@ -2713,8 +2669,8 @@ function is_123_set($string = '', $min = 0, $max = NULL) {
  */
 function is_abc_set($string = '', $min = 0, $max = NULL) {
   return preg_match( '/^[a-z]+(\s{0,1}\,\s{0,1}[a-z]+){' .
-      ( $min ? intval($min) - 1 : 0) . ',' .
-      ( $max ? intval($max) - 1 : NULL) . '}$/i', CAST_TO_STRING( $string ) ) ? TRUE : FALSE;
+    ( $min ? intval($min) - 1 : 0) . ',' .
+    ( $max ? intval($max) - 1 : NULL) . '}$/i', CAST_TO_STRING( $string ) ) ? TRUE : FALSE;
 }
 
 /**
@@ -2738,8 +2694,8 @@ function is_abc_set($string = '', $min = 0, $max = NULL) {
  */
 function is_123abc_set($string = '', $min = 0, $max = NULL) {
   return preg_match('/^[0-9a-z]+(\s{0,1}\,\s{0,1}[0-9a-z]+){' .
-      ($min ? intval($min) - 1 : 0) . ',' .
-      ($max ? intval($max) - 1 : NULL) . '}$/i', CAST_TO_STRING($string)) ? TRUE : FALSE;
+    ($min ? intval($min) - 1 : 0) . ',' .
+    ($max ? intval($max) - 1 : NULL) . '}$/i', CAST_TO_STRING($string)) ? TRUE : FALSE;
 }
 
 /**
@@ -2755,8 +2711,8 @@ function is_123abc_set($string = '', $min = 0, $max = NULL) {
  */
 function is_word_set($string = '', $min = 0, $max = NULL) {
   return preg_match( '/^[^\/\\$&?]+(\s{0,1}\,\s{0,1}[^\/\\$&?]+){' .
-      ( $min ? intval( $min ) - 1 : 0) . ',' .
-      ( $max ? intval( $max ) - 1 : NULL) . '}$/i', CAST_TO_STRING( $string ) ) ? TRUE : FALSE;
+    ( $min ? intval( $min ) - 1 : 0) . ',' .
+    ( $max ? intval( $max ) - 1 : NULL) . '}$/i', CAST_TO_STRING( $string ) ) ? TRUE : FALSE;
 }
 
 /**
@@ -2903,13 +2859,13 @@ function alternator() {
 function randstr($len = 4, $charlist = 'a-zA-Z0-9') {
 
   $charlist = str_replace(
-      array('0-9', 'a-z', 'A-Z'),
-      array(
-          '0123456789',
-          'wertyuiopasdfghjklzxcvbnm',
-          'QWERTYUIOPASDFGHJKLZXCVBNM',
-      ),
-      $charlist
+    array('0-9', 'a-z', 'A-Z'),
+    array(
+      '0123456789',
+      'wertyuiopasdfghjklzxcvbnm',
+      'QWERTYUIOPASDFGHJKLZXCVBNM',
+    ),
+    $charlist
   );
 
   $string = '';
@@ -3054,16 +3010,16 @@ function assoc_to_path($array = array()) {
 function text_pretty_format($string = '') {
 
   $string = strtr($string, array(
-      '---' => '&#8212;&#8212;',
-      '--' => '&#8212;',
-      '...' => '&#133;',
-      '>>' => '&#187;',
-      '<<' => '&#171;',
-      '(tm)' => '&#8482;',
-      '+-' => '&#177;',
-      '(c)' => '&#169',
-      '(r)' => '&#174',
-      '$' => '&#36;'
+    '---' => '&#8212;&#8212;',
+    '--' => '&#8212;',
+    '...' => '&#133;',
+    '>>' => '&#187;',
+    '<<' => '&#171;',
+    '(tm)' => '&#8482;',
+    '+-' => '&#177;',
+    '(c)' => '&#169',
+    '(r)' => '&#174',
+    '$' => '&#36;',
   ));
   $string = preg_replace( '#\"([^\"]*)\"#', '&ldquo;$1&rdquo;', $string );
   $string = preg_replace( '#\'([^\']*)\'#', '&lsquo;$1&rsquo;', $string );
@@ -3087,11 +3043,9 @@ function excerpt($string = '', $limit = 100, $end_char = '&#8230;') {
   $string = CAST_TO_STRING($string);
 
   preg_match( '/^\s*+(?:\S++\s*+){1,' . CAST_TO_INT($limit) . '}/', $string, $matches );
-
   if ( strlen($string) == strlen($matches[0]) ) {
     $end_char = '';
   }
-
   unset( $string );
 
   return rtrim( $matches[0] ) . $end_char;
@@ -3236,39 +3190,30 @@ function sql_type_to_widget( $type = '' ) {
   if ( preg_match('/^(tinyint\(1\)|bool|boolean)/i', $type) ) {
     $widget = 'checkbox';
   }
-
   elseif ( preg_match('/^(tinyint|mediumint|int|smallint|bigint|numeric|real|double|float)/i', $type)) {
     $widget = 'number';
   }
-
   elseif ( preg_match('/^(tinytext|text|mediumtext|longtext)/i', $type) ) {
     $widget = 'textarea';
   }
-
   elseif ( preg_match('/^(tinyblob|blob|mediumblob|longblob)/i', $type) ) {
     $widget = 'file';
   }
-
   elseif ( preg_match('/^(timestamp|datetime)/i', $type) ) {
     $widget = 'datetime';
   }
-
   elseif ( preg_match('/^date/i', $type) ) {
     $widget = 'date';
   }
-
   elseif ( preg_match('/^time/i', $type) ) {
     $widget = 'time';
   }
-
   elseif ( preg_match('/^set\(.*\)/i', $type) ) {
     $widget = 'checkboxes';
   }
-
   elseif ( preg_match('/^enum\(.*\)/i', $type) ) {
     $widget = 'select';
   }
-
   else {
     $widget = 'text';
   }
@@ -3285,8 +3230,8 @@ function sql_type_to_widget( $type = '' ) {
  */
 function sql_is_time_interval( $string = '' ) {
   return preg_match( '/^\d{1,3}\s(MINUTE|HOUR|DAY|WEEK|MONTH|YEAR)$/i', CAST_TO_STRING( $string ) )
-  ? TRUE
-  : FALSE;
+    ? TRUE
+    : FALSE;
 }
 
 /**
@@ -3331,20 +3276,20 @@ function transliterate($string = '', $from_latin = FALSE) {
   }
 
   $ctable = array(
-      // cyr
-      'А' => 'A', 'Б' => 'B', 'В' => 'V', 'Г' => 'G', 'Д' => 'D', 'Е' => 'E', 'Ё' => 'E', 'Ж' => 'ZH', 'З' => 'Z', 'Й' => 'I',
-      'К' => 'K', 'Л' => 'L', 'М' => 'M', 'Н' => 'N', 'О' => 'O', 'П' => 'P', 'Р' => 'R', 'С' => 'S', 'Т' => 'T', 'У' => 'U',
-      'Ф' => 'F', 'Х' => 'KH', 'Ц' => 'TS', 'Ч' => 'CH', 'Ш' => 'SH', 'Щ' => 'SHT', 'Ы' => 'Y', 'Э' => 'E', 'Ю' => 'YU',
-      'Я' => 'YA', 'а' => 'a', 'б' => 'b', 'в' => 'v', 'г' => 'g', 'д' => 'd', 'е' => 'e', 'ё' => 'e', 'ж' => 'zh', 'з' => 'z',
-      'и' => 'i', 'й' => 'i', 'к' => 'k', 'л' => 'l', 'м' => 'm', 'н' => 'n', 'о' => 'o', 'п' => 'p', 'р' => 'r', 'с' => 's',
-      'т' => 't', 'у' => 'u', 'ф' => 'f', 'х' => 'kh', 'ц' => 'ts', 'ч' => 'ch', 'ш' => 'sh', 'щ' => 'sht', 'ы' => 'y',
-      'э' => 'e', 'ю' => 'yu', 'я' => 'ya', 'Ъ' => 'A', 'ъ' => 'a', 'Ь' => 'Y', 'ь' => 'y',
-      // greek
-      'Σ' => 'S', 'σ' => 's', 'ς' => 's', 'Ψ' => 'PS', 'Ω' => 'O', 'Ξ' => 'X', 'Θ' => 'TH', 'Δ' => 'D', 'ή' => 'NG', 'ΤΘ' => 'TTH',
-      'ΤΖ' => 'TJ', 'γ' => 'g', 'ζ' => 'z', 'ξ' => 'x', 'φ' => 'F', 'Φ' => 'f', 'ω' => 'o', 'ι' => 'i', 'δ' => 'd', 'β' => 'b',
-      'α' => 'a', 'π' => 'pe', 'ϻ' => 'sin', 'ϝ' => 'waw',
-      // simple mandarin
-      'ㄔ' => 'c', 'ㄚ' => 'a', 'ㄞ' => 'ai', 'ㄢ' => 'an', 'ㄤ' => 'ar', 'ㄅ' => 'b', 'ㄅ' => 'be', 'ㄠ' => 'sw', 'ㄓ' => 'jw'
+    // cyr
+    'А' => 'A', 'Б' => 'B', 'В' => 'V', 'Г' => 'G', 'Д' => 'D', 'Е' => 'E', 'Ё' => 'E', 'Ж' => 'ZH', 'З' => 'Z', 'Й' => 'I',
+    'К' => 'K', 'Л' => 'L', 'М' => 'M', 'Н' => 'N', 'О' => 'O', 'П' => 'P', 'Р' => 'R', 'С' => 'S', 'Т' => 'T', 'У' => 'U',
+    'Ф' => 'F', 'Х' => 'KH', 'Ц' => 'TS', 'Ч' => 'CH', 'Ш' => 'SH', 'Щ' => 'SHT', 'Ы' => 'Y', 'Э' => 'E', 'Ю' => 'YU',
+    'Я' => 'YA', 'а' => 'a', 'б' => 'b', 'в' => 'v', 'г' => 'g', 'д' => 'd', 'е' => 'e', 'ё' => 'e', 'ж' => 'zh', 'з' => 'z',
+    'и' => 'i', 'й' => 'i', 'к' => 'k', 'л' => 'l', 'м' => 'm', 'н' => 'n', 'о' => 'o', 'п' => 'p', 'р' => 'r', 'с' => 's',
+    'т' => 't', 'у' => 'u', 'ф' => 'f', 'х' => 'kh', 'ц' => 'ts', 'ч' => 'ch', 'ш' => 'sh', 'щ' => 'sht', 'ы' => 'y',
+    'э' => 'e', 'ю' => 'yu', 'я' => 'ya', 'Ъ' => 'A', 'ъ' => 'a', 'Ь' => 'Y', 'ь' => 'y',
+    // greek
+    'Σ' => 'S', 'σ' => 's', 'ς' => 's', 'Ψ' => 'PS', 'Ω' => 'O', 'Ξ' => 'X', 'Θ' => 'TH', 'Δ' => 'D', 'ή' => 'NG', 'ΤΘ' => 'TTH',
+    'ΤΖ' => 'TJ', 'γ' => 'g', 'ζ' => 'z', 'ξ' => 'x', 'φ' => 'F', 'Φ' => 'f', 'ω' => 'o', 'ι' => 'i', 'δ' => 'd', 'β' => 'b',
+    'α' => 'a', 'π' => 'pe', 'ϻ' => 'sin', 'ϝ' => 'waw',
+    // simple mandarin
+    'ㄔ' => 'c', 'ㄚ' => 'a', 'ㄞ' => 'ai', 'ㄢ' => 'an', 'ㄤ' => 'ar', 'ㄅ' => 'b', 'ㄅ' => 'be', 'ㄠ' => 'sw', 'ㄓ' => 'jw'
   );
 
   $ctable = do_hook( 'transliterate', $ctable );
@@ -3352,7 +3297,6 @@ function transliterate($string = '', $from_latin = FALSE) {
   if ( $from_latin ) {
     array_flip( $ctable );
   }
-
   return strtr( $string, $ctable );
 }
 
@@ -3369,10 +3313,9 @@ function transliterate($string = '', $from_latin = FALSE) {
  */
 
 /**
- * Main Application class, provide a flexible MVC alike separation.
+ * Main TI_Application class, provide a flexible MVC alike separation.
  */
-if ( !class_exists( 'Application') ):
-class Application {
+class TI_Application {
 
   static private $is_main = TRUE;
   static private $variables = array();
@@ -3419,6 +3362,9 @@ class Application {
 
     $url = '/' . trim( $url, '/' );
 
+    // Trim folder install from the url.
+    $url = substr( $url, strlen( pathinfo( $_SERVER['PHP_SELF'], PATHINFO_DIRNAME ) ) );
+
     $this->arguments = array();
 
     foreach ( do_hook( 'url_rewrites', array() ) as $rule => $rurl ) {
@@ -3449,6 +3395,7 @@ class Application {
     foreach ( $url_segments as $segment ) {
       $url = implode( '/', $url_segments );
       if ( is_readable( TI_PATH_APP . '/' . TI_FOLDER_CONTROLLER . '/' . $url . TI_EXT_CONTROLLER ) ) {
+        self::$is_main = FALSE;
         include( TI_PATH_APP . '/' . TI_FOLDER_CONTROLLER . '/' . $url . TI_EXT_CONTROLLER );
         if ( TI_AUTORENDER ) {
           $this->render( $url );
@@ -3457,6 +3404,7 @@ class Application {
       }
       // Fallback to index
       elseif ( is_readable( TI_PATH_APP . '/' . TI_FOLDER_CONTROLLER . '/' . $url . '/index' . TI_EXT_CONTROLLER ) ) {
+        self::$is_main = FALSE;
         include( TI_PATH_APP . '/' . TI_FOLDER_CONTROLLER . '/' . $url . '/index' . TI_EXT_CONTROLLER );
         if ( TI_AUTORENDER ) {
           $this->render( $url );
@@ -3559,13 +3507,11 @@ class Application {
   }
 
 }
-endif;
 
 /**
  * Database wraper class for PDO
  */
-if ( !class_exists( 'Database') ):
-class Database extends PDO {
+class TI_Database extends PDO {
 
   /**
    * Database table's prefix
@@ -3831,13 +3777,11 @@ class Database extends PDO {
   }
 
 }
-endif;
 
 /**
  * Messagebus class.
  */
-if ( !class_exists( 'Messagebus') ):
-class Messagebus {
+class TI_Messagebus {
 
   /**
    * Allowed HTML tags to be used in message body.
@@ -3911,7 +3855,6 @@ class Messagebus {
   }
 
 }
-endif;
 
 /**
  * Calendar based events.
@@ -4656,7 +4599,7 @@ endif;
  */
 
 // Set the framework version.
-define( 'TI_FW_VERSION', '0.9.9.0' );
+define( 'TI_FW_VERSION', '0.9.9.1' );
 
 // Start the timer.
 define( 'TI_TIMER_START', microtime( TRUE ) );
@@ -4691,9 +4634,6 @@ if ( !defined( 'TI_PATH_APP' ) ) {
     die( 'Application path not defined.' );
   }
 }
-
-// Detect the webpath.
-defined( 'TI_PATH_WEB' ) or define( 'TI_PATH_WEB', trailingslashit( pathinfo( $_SERVER['SCRIPT_NAME'], PATHINFO_DIRNAME ) ) );
 
 // Internationalization.
 defined( 'TI_LOCALE' )              or define( 'TI_LOCALE', 'en_US' );
@@ -4770,14 +4710,15 @@ if ( !is_cli() && empty( $_SERVER['REMOTE_ADDR'] ) ) {
 }
 
 // Exit if favicon request detected.
-if ( '/favicon.ico' == $_SERVER['REQUEST_URI'] ) {
+if ( $_SERVER['REQUEST_URI'] === site_url( '/favicon.ico' )) {
   header( 'Content-Type: image/vnd.microsoft.icon' );
   header( 'Content-Length: 0' );
   exit;
 }
 
 // Show documentation or continue with the app.
-if ( defined('TI_DOCUMENTATION') && is_string( TI_DOCUMENTATION ) && $_SERVER['REQUEST_URI'] === '/' . TI_DOCUMENTATION ) {
+if ( defined('TI_DOCUMENTATION') && is_string( TI_DOCUMENTATION )
+  && TI_DOCUMENTATION && $_SERVER['REQUEST_URI'] === site_url( TI_DOCUMENTATION ) ) {
   include TI_PATH_FRAMEWORK . '/documentation.php';
   exit;
 }
@@ -4785,17 +4726,16 @@ if ( defined('TI_DOCUMENTATION') && is_string( TI_DOCUMENTATION ) && $_SERVER['R
 // Register autoloader function.
 spl_autoload_register( 'ti_autoloader' );
 
+// Register shutdown hook.
+register_shutdown_function( 'do_hook', 'shutdown' );
+
 // Check for __application.php
 if ( is_readable( TI_PATH_APP . '/' . TI_AUTOLOAD_FILE ) ) {
   include TI_PATH_APP . '/' . TI_AUTOLOAD_FILE;
 }
 
 // Let boot the app.
-$Application = new Application( $_SERVER['REQUEST_URI'] );
-
-// Fire the shutdown hook.
-// @fire shutdown
-do_hook( 'shutdown' );
+$Application = Application( $_SERVER['REQUEST_URI'] );
 
 /**
  * @} End of "defgroup framework bootstrap".
