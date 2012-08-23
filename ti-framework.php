@@ -170,7 +170,7 @@ function Application($url = '', $return = FALSE) {
   static $is_main = TRUE;
 
   // If we have to return the rendered result, this is possible only for non-main urls.
-  if ( !$is_main && $return ) {
+  if ( $return && !$is_main ) {
     ob_start();
     Application( $url, FALSE );
     return ob_get_clean();
@@ -197,28 +197,15 @@ function Application($url = '', $return = FALSE) {
   $url_segments = explode( '/', ltrim( $url, '/' ) );
   $url_args = array();
   do {
-
     $path = implode( '/', $url_segments );
     $class = 'Controller' . ucfirst( end( $url_segments ) );
 
     if ( $path && $class ) {
       $controller_path = TI_PATH_APP . '/' . TI_FOLDER_CONTROLLER . '/' . $path . TI_EXT_CONTROLLER;
       if ( is_readable( $controller_path )) {
-        include_once $controller_path;
-        if ( $url_args ) {
-          $method = ucfirst( array_pop( $url_args ) );
-        }
-        else {
-          $method = 'Index';
-        }
-        if ( class_exists( $class ) && is_callable( array($class, $method) ) ) {
-          $is_main = FALSE;
-          $the_class = new $class;
-          return call_user_func_array( array($the_class, $method), array_reverse( $url_args ) );
-        }
-        else {
-          break;
-        }
+        $is_main = FALSE;
+        $app = new TI_Application( $controller_path, array_reverse( $url_args ) );
+        return $app;
       }
     }
   } while ( $url_args[]  = array_pop( $url_segments ) );
@@ -430,13 +417,13 @@ endif;
 /**
  * ti-framework class autoloader function.
  *
- * @fire __autoload
+ * @fire include_library
  *
  * @param string $library
  *
  * @return bool
  */
-function ti_autoloader($library = '') {
+function include_library($library = '') {
 
   $library = strtolower( $library );
 
@@ -446,7 +433,7 @@ function ti_autoloader($library = '') {
       TI_PATH_APP . '/' . TI_FOLDER_INC . '/' . $library . TI_EXT_INC,
   );
 
-  $possible_files = do_hook( '__autoload', $possible_files, $library );
+  $possible_files = do_hook( 'include_library', $possible_files, $library );
 
   foreach ( $possible_files as $file ) {
     if ( is_readable( $file ) ) {
@@ -3412,9 +3399,7 @@ function transliterate($string = '', $from_latin = FALSE) {
 /**
  * Main TI_Application class, provide a flexible MVC alike separation.
  */
-abstract class TI_Controller {
-
-  abstract public function Index();
+class TI_Application {
 
   /**
    * Store all variables for current instance.
@@ -3423,7 +3408,46 @@ abstract class TI_Controller {
    *
    * @var array
    */
-  private $variables = array();
+  private $__variables = array();
+
+  /**
+   * Store the controller file path.
+   *
+   * @access private
+   *
+   * @var string
+   */
+  private $__controller_path = '';
+
+  /**
+   * Store the arguments.
+   *
+   * @access private
+   *
+   * @var array
+   */
+  private $__arguments = array();
+
+  /**
+   * Class constructor.
+   *
+   * @param string $controller_path
+   * @param string $arguments
+   */
+  function __construct( $controller_path, $arguments ) {
+    $this->__controller_path = $controller_path;
+    $this->__arguments = $arguments;
+    $this->boot();
+  }
+
+  /**
+   * Include the controller.
+   *
+   * @access private
+   */
+  private function boot() {
+    include $this->__controller_path;
+  }
 
   /**
    * Render the controller acording the view.
@@ -3438,11 +3462,31 @@ abstract class TI_Controller {
     if ( $view ) {
       $view = TI_PATH_APP . '/' . TI_FOLDER_VIEW  . '/' . string_sanitize( $view ). TI_EXT_VIEW;
       if ( is_readable( $view ) ) {
-        extract( $this->variables, EXTR_REFS );
-        include( $view );
+        extract( $this->__variables, EXTR_REFS );
+        return include( $view );
       }
     }
     show_error( 'View error', 'The view <strong>' . func_get_arg(0) . '</strong> not exists.' );
+  }
+
+  /**
+   * Get Nth argument or return NULL if it is not exists.
+   *
+   * @param int $n
+   *
+   * @return string|NULL
+   */
+  public function arg($n = 0) {
+    return isset( $this->__arguments[$n] ) ? $this->__arguments[$n] : NULL;
+  }
+
+  /**
+   * Get all arguments.
+   *
+   * @return array
+   */
+  public function args() {
+    return $this->__arguments;
   }
 
   /**
@@ -3453,7 +3497,7 @@ abstract class TI_Controller {
    * @return array
    */
   protected function vars() {
-    return $this->variables;
+    return $this->__variables;
   }
 
   /**
@@ -3467,7 +3511,7 @@ abstract class TI_Controller {
    * @return bool
    */
   public function __set($key, $value = NULL) {
-    return ( $this->variables[$key] = $value );
+    return ( $this->__variables[$key] = $value );
   }
 
   /**
@@ -3480,8 +3524,8 @@ abstract class TI_Controller {
    * @return mixed
    */
   public function &__get($key) {
-    if ( isset( $this->variables[$key] ) ) {
-      return $this->variables[$key];
+    if ( isset( $this->__variables[$key] ) ) {
+      return $this->__variables[$key];
     }
     else {
       $val = NULL;
@@ -4709,7 +4753,7 @@ if ( !defined( 'TI_DISABLE_BOOT' )) {
   }
 
   // Register autoloader function.
-  spl_autoload_register( 'ti_autoloader' );
+  spl_autoload_register( 'include_library' );
 
   // Register shutdown hook.
   // @fire shutdown
