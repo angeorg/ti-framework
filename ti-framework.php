@@ -148,17 +148,89 @@ function _ti_session_start() {
 /**
  * Load URL when define new object of Application with parameters.
  *
- * @see Application->load().
+ * <?php
+ *  add_hook( 'url_rewrites', function($rules) {
+ *    $rules['create-new'] = 'users/0/create';
+ *    $rules['edit-user-(.+)'] = 'users/$1/edit';
+ *    return $rules;
+ *  });
+ * ?>
+ *
+ * @fire url_rewrites
  *
  * @param string $url
+ *   url to the controller
  * @param string $return
+ *   determine to return the output or not
  *
- * @return Application
+ * @return string|bool
  */
 function Application($url = '', $return = FALSE) {
-  $app = new TI_Application( $url, $return );
-  return $app;
+
+  static $is_main = TRUE;
+
+  // If we have to return the rendered result, this is possible only for non-main urls.
+  if ( !$is_main && $return ) {
+    ob_start();
+    Application( $url, FALSE );
+    return ob_get_clean();
+  }
+
+  $url = '/' . trim( $url, '/' );
+
+  // Trim folder install from the url.
+  $url = substr( $url, strlen( pathinfo( $_SERVER['PHP_SELF'], PATHINFO_DIRNAME ) ) );
+
+  foreach ( do_hook( 'url_rewrites', array() ) as $rule => $rurl ) {
+    if ( preg_match( '#^\/' . $rule . '$#i', $url ) ) {
+      $url = preg_replace( '#^\/' . $rule . '$#i', $rurl, $url );
+      break;
+    }
+  }
+
+  // Protect private controllers.
+  if ($is_main && preg_match( '#\/(\_|\.)#', $url ) ) {
+    show_404();
+  }
+
+  // Handle when arguments need to be passed.
+  $url_segments = explode( '/', ltrim( $url, '/' ) );
+  $url_args = array();
+  do {
+
+    $path = implode( '/', $url_segments );
+    $class = 'Controller' . ucfirst( end( $url_segments ) );
+
+    if ( $path && $class ) {
+      $controller_path = TI_PATH_APP . '/' . TI_FOLDER_CONTROLLER . '/' . $path . TI_EXT_CONTROLLER;
+      if ( is_readable( $controller_path )) {
+        include_once $controller_path;
+        if ( $url_args ) {
+          $method = ucfirst( array_pop( $url_args ) );
+        }
+        else {
+          $method = 'Index';
+        }
+        if ( class_exists( $class ) && is_callable( array($class, $method) ) ) {
+          $is_main = FALSE;
+          $the_class = new $class;
+          return call_user_func_array( array($the_class, $method), array_reverse( $url_args ) );
+        }
+        else {
+          break;
+        }
+      }
+    }
+  } while ( $url_args[]  = array_pop( $url_segments ) );
+
+  if ( $is_main ) {
+    show_404();
+  }
+  else {
+    show_error( 'Controller error', 'The controller <strong>' . $url . '</strong> not exists.' );
+  }
 }
+
 
 /**
  * Message Bus class
@@ -278,6 +350,7 @@ function db($db_id = '') {
   return NULL;
 }
 
+if ( !function_exists( 'is_cli' )):
 /**
  * Is the application run in command line mode
  *
@@ -286,23 +359,35 @@ function db($db_id = '') {
 function is_cli() {
   return PHP_SAPI == 'cli';
 }
+endif;
 
+if ( !function_exists( 'is_ssl' )):
 /**
  * Determine if SSL is used.
+ *
+ * @fire is_ssl
  *
  * @return bool
  *   True if SSL, false if not used.
  */
 function is_ssl() {
-  if ( !empty( $_SERVER['HTTPS'] ) && ( strtolower( $_SERVER['HTTPS'] ) == 'on' || $_SERVER['HTTPS'] == '1' ) ) {
-    return TRUE;
+  static $is_ssl = NULL;
+  if ( $is_ssl === NULL ) {
+    if ( !empty( $_SERVER['HTTPS'] ) && ( strtolower( $_SERVER['HTTPS'] ) == 'on' || $_SERVER['HTTPS'] == '1' ) ) {
+      $is_ssl = TRUE;
+    }
+    elseif ( !empty( $_SERVER['SERVER_PORT'] ) && ( $_SERVER['SERVER_PORT'] == '443' ) ) {
+      $is_ssl =TRUE;
+    }
+    else {
+      $is_ssl =FALSE;
+    }
   }
-  elseif ( !empty( $_SERVER['SERVER_PORT'] ) && ( $_SERVER['SERVER_PORT'] == '443' ) ) {
-    return TRUE;
-  }
-  return FALSE;
+  return do_hook( 'is_ssl', $is_ssl );
 }
+endif;
 
+if ( !function_exists( 'is_ajax' )):
 /**
  * Is the application run from ajax query
  *
@@ -311,10 +396,15 @@ function is_ssl() {
  * @return bool
  */
 function is_ajax() {
-  return do_hook( 'is_ajax', TI_IS_AJAX );
+  static $is_ajax = NULL;
+  if ( $is_ajax === NULL ) {
+    $is_ajax = ( strtolower( ifsetor( $_SERVER['HTTP_X_REQUESTED_WITH'] ) == 'xmlhttprequest') );
+  }
+  return do_hook( 'is_ajax', $is_ajax );
 }
+endif;
 
-if (!function_exists('get_ip')):
+if ( !function_exists( 'get_ip' )):
 /**
  * Get the IP of visitor
 *
@@ -388,27 +478,28 @@ function ti_autoloader($library = '') {
  */
 function is_mobile() {
 
-  $is_mobile = FALSE;
+  static $is_mobile = NULL;
 
-  $user_agent = $_SERVER['HTTP_USER_AGENT'];
-  $accept = $_SERVER['HTTP_ACCEPT'];
+  if ( $is_mobile === NULL ) {
 
-  if ( stripos( $user_agent, 'tablet' ) !== FALSE ) {
-    $is_mobile = FALSE;
-  }
-  elseif ( preg_match( '#(ipod|android|symbian|blackbarry|gsm|phone|mobile|opera mini)#', $user_agent ) ) {
-    $is_mobile = TRUE;
-  }
-  elseif ( strpos( $accept, 'text/vnd.wap.wml' ) > 0 || strpos( $accept, 'application/vnd.wap.xhtml+xml') > 0  ) {
-    $is_mobile = TRUE;
-  }
-  elseif ( isset( $_SERVER['HTTP_X_WAP_PROFILE'] ) || isset( $_SERVER['HTTP_PROFILE'] ) ) {
-    $is_mobile = TRUE;
+    $user_agent = $_SERVER['HTTP_USER_AGENT'];
+    $accept = $_SERVER['HTTP_ACCEPT'];
+
+    if ( stripos( $user_agent, 'tablet' ) !== FALSE ) {
+      $is_mobile = FALSE;
+    }
+    elseif ( preg_match( '#(ipod|android|symbian|blackbarry|gsm|phone|mobile|opera mini)#', $user_agent ) ) {
+      $is_mobile = TRUE;
+    }
+    elseif ( strpos( $accept, 'text/vnd.wap.wml' ) > 0 || strpos( $accept, 'application/vnd.wap.xhtml+xml') > 0  ) {
+      $is_mobile = TRUE;
+    }
+    elseif ( isset( $_SERVER['HTTP_X_WAP_PROFILE'] ) || isset( $_SERVER['HTTP_PROFILE'] ) ) {
+      $is_mobile = TRUE;
+    }
   }
 
-  $is_mobile = do_hook( 'is_mobile', $is_mobile, $user_agent, $accept );
-
-  return CAST_TO_BOOL( $is_mobile );
+  return CAST_TO_BOOL( do_hook( 'is_mobile', $is_mobile, $user_agent, $accept ) );
 }
 
 /**
@@ -567,7 +658,7 @@ function untrailingslashit($string) {
  *   destination url or current url
  * @param int $time_to_wait
  *   time to wait before redirect
- * 
+ *
  * @return void
  */
 function redirect($url = NULL, $time_to_wait = 0) {
@@ -865,7 +956,7 @@ function set_document_downloadable($filename = '', $size = 0) {
  *
  * <?php
  *   // Simple page authorization.
- *   document_auth( 'Please authorize!', function($user, $pass) {
+ *   document_auth( function($user, $pass) {
  *     // Callback takes two parameters:
  *     // 1st - $username
  *     // 2nd - $password
@@ -877,7 +968,13 @@ function set_document_downloadable($filename = '', $size = 0) {
  *       return FALSE;
  *     }
  *
- *   });
+ *   }, 'Please authorize!');
+ *
+ *   // Or old style like:
+ *   function _my_app_auth($user, $pass) {
+ *     return ( $user == 'user' && $pass = 'pass' );
+ *   }
+ *   document_auth( '_my_app_auth', 'Please Get Login' );
  * ?>
  *
  * @param string $callback
@@ -888,7 +985,7 @@ function set_document_downloadable($filename = '', $size = 0) {
  *
  * @return bool
  */
-function document_auth($callback = '', $message = '') {
+function document_auth($callback = '', $message = 'Please login') {
 
   if ( headers_sent() ) {
     $callback = create_function( '', 'return FALSE;' );
@@ -2461,7 +2558,7 @@ function paginate($page_no, $entries, $base_url = '', $echo = TRUE, $id = '') {
   if ( $conf->size ) {
     $half_size = floor( $conf->size / 2 );
 
-    $even = $this->size % 2 ? 1 : 0;
+    $even = $conf->size % 2 ? 1 : 0;
 
     $for_loops = $page_no + $half_size + $even;
     $i = $page_no - $half_size + 1;
@@ -3315,112 +3412,18 @@ function transliterate($string = '', $from_latin = FALSE) {
 /**
  * Main TI_Application class, provide a flexible MVC alike separation.
  */
-class TI_Application {
+abstract class TI_Controller {
 
-  static private $is_main = TRUE;
-  static private $variables = array();
-
-  private $arguments = array();
+  abstract public function Index();
 
   /**
-   * Load URL when define new object of Application with parameters.
+   * Store all variables for current instance.
    *
-   * @see load() method.
+   * @access private
    *
-   * @access public
-   *
-   * @param string $url
-   * @param bool $return
-   *
-   * @return Application
+   * @var array
    */
-  public function __construct($url = '', $return = FALSE) {
-    if ( $url ) {
-      $this->load( $url, $return );
-    }
-    return $this;
-  }
-
-  /**
-   * Load URL and process it.
-   *
-   *  add_hook( 'url_rewrites', function($rules) {
-   *    $rules['create-new'] = 'users/0/create';
-   *    $rules['edit-user-(.+)'] = 'users/$1/edit';
-   *    return $rules;
-   *  });
-   *
-   * @fire url_rewrites
-   *
-   * @access public
-   *
-   * @param string $url
-   *
-   * @return string|NULL
-   */
-  public function load($url = '') {
-
-    $url = '/' . trim( $url, '/' );
-
-    // Trim folder install from the url.
-    $url = substr( $url, strlen( pathinfo( $_SERVER['PHP_SELF'], PATHINFO_DIRNAME ) ) );
-
-    $this->arguments = array();
-
-    foreach ( do_hook( 'url_rewrites', array() ) as $rule => $rurl ) {
-      if ( preg_match( '#^\/' . $rule . '$#i', $url ) ) {
-        $url = preg_replace( '#^\/' . $rule . '$#i', $rurl, $url );
-        break;
-      }
-    }
-
-    // Protect private controllers.
-    if (self::$is_main && preg_match( '#\/(\_|\.)#', $url ) ) {
-      show_404();
-    }
-
-    // Handle when url exists on a controllers folder as is.
-    if ( is_readable( TI_PATH_APP . '/' . TI_FOLDER_CONTROLLER . $url . TI_EXT_CONTROLLER )) {
-      self::$is_main = FALSE;
-      include( TI_PATH_APP . '/' . TI_FOLDER_CONTROLLER . $url . TI_EXT_CONTROLLER );
-      if ( TI_AUTORENDER ) {
-        $this->render( $url );
-      }
-      return TRUE;
-    }
-
-    // Handle when arguments need to be passed.
-    $url_segments = explode( '/', ltrim( $url, '/' ) );
-
-    foreach ( $url_segments as $segment ) {
-      $url = implode( '/', $url_segments );
-      if ( is_readable( TI_PATH_APP . '/' . TI_FOLDER_CONTROLLER . '/' . $url . TI_EXT_CONTROLLER ) ) {
-        self::$is_main = FALSE;
-        include( TI_PATH_APP . '/' . TI_FOLDER_CONTROLLER . '/' . $url . TI_EXT_CONTROLLER );
-        if ( TI_AUTORENDER ) {
-          $this->render( $url );
-        }
-        return TRUE;
-      }
-      // Fallback to index
-      elseif ( is_readable( TI_PATH_APP . '/' . TI_FOLDER_CONTROLLER . '/' . $url . '/index' . TI_EXT_CONTROLLER ) ) {
-        self::$is_main = FALSE;
-        include( TI_PATH_APP . '/' . TI_FOLDER_CONTROLLER . '/' . $url . '/index' . TI_EXT_CONTROLLER );
-        if ( TI_AUTORENDER ) {
-          $this->render( $url );
-        }
-        return TRUE;
-      }
-      array_unshift( $this->arguments, array_pop( $url_segments ) );
-    }
-
-    if ( self::$is_main ) {
-      show_404();
-    }
-    else {
-      show_error( 'Controller error', 'The controller <strong>' . $url . '</strong> not exists.' );
-    }
-  }
+  private $variables = array();
 
   /**
    * Render the controller acording the view.
@@ -3429,50 +3432,28 @@ class TI_Application {
    *
    * @param string $view
    *   the view from the TI_FOLDER_VIEW, if it is empty
-   *   then framework will check if it is available
-   *   view with same name as the controller.
+   *   then framework will check if it is available.
    */
-  public function render() {
-    if ( func_num_args() > 0 ) {
-      if ( is_readable( TI_PATH_APP . '/' . TI_FOLDER_VIEW  . '/' . func_get_arg(0) . TI_EXT_VIEW ) ) {
-        extract( self::$variables, EXTR_REFS );
-        include( TI_PATH_APP . '/' . TI_FOLDER_VIEW  . '/' . func_get_arg(0) . TI_EXT_VIEW );
-      }
-      if ( !TI_AUTORENDER ) {
-        show_error('Template error', 'The template <strong>' . func_get_arg(0) . '</strong> not exists.');
+  protected function render($view = '') {
+    if ( $view ) {
+      $view = TI_PATH_APP . '/' . TI_FOLDER_VIEW  . '/' . string_sanitize( $view ). TI_EXT_VIEW;
+      if ( is_readable( $view ) ) {
+        extract( $this->variables, EXTR_REFS );
+        include( $view );
       }
     }
-  }
-
-  /**
-   * Get Nth argument or return NULL if it is not exists.
-   *
-   * @param int $n
-   *
-   * @return string|NULL
-   */
-  public function arg($n = 0) {
-    return isset( $this->arguments[$n] ) ? $this->arguments[$n] : NULL;
-  }
-
-  /**
-   * Get all arguments.
-   *
-   * @return array
-   */
-  public function args() {
-    return $this->arguments;
+    show_error( 'View error', 'The view <strong>' . func_get_arg(0) . '</strong> not exists.' );
   }
 
   /**
    * Get all shared variables.
    *
-   * @access public
+   * @access protected
    *
    * @return array
    */
-  public function vars() {
-    return self::$variables;
+  protected function vars() {
+    return $this->variables;
   }
 
   /**
@@ -3486,7 +3467,7 @@ class TI_Application {
    * @return bool
    */
   public function __set($key, $value = NULL) {
-    return ( self::$variables[$key] = $value );
+    return ( $this->variables[$key] = $value );
   }
 
   /**
@@ -3499,11 +3480,13 @@ class TI_Application {
    * @return mixed
    */
   public function &__get($key) {
-    if ( isset( self::$variables[$key] ) ) {
-      return self::$data[$key];
+    if ( isset( $this->variables[$key] ) ) {
+      return $this->variables[$key];
     }
-    $val = NULL;
-    return $val;
+    else {
+      $val = NULL;
+      return $val;
+    }
   }
 
 }
@@ -4596,6 +4579,9 @@ endif;
  * @{
  *
  * Booting the ti-framework, after all functions and classes are defined.
+ * The bootleader can be disabled if the TI_DISABLE_BOOT constant is defined,
+ * before this file, this means that u can use the ti-framework.php like,
+ * a library for your applications.
  */
 
 // Set the framework version.
@@ -4657,85 +4643,86 @@ defined( 'TI_FOLDER_CACHE' )        or define( 'TI_FOLDER_CACHE', 'cache' );
 // Fix server vars for $_SERVER['REQUEST_URI'].
 _ti_fix_server_vars();
 
-// Set debugging mode.
-if ( TI_DEBUG_MODE ) {
-  error_reporting( E_ALL );
-  ini_set( 'display_errors', 1 );
-  ini_set( 'display_startup_errors', TRUE );
+if ( !defined( 'TI_DISABLE_BOOT' )) {
+
+  // Set debugging mode.
+  if ( TI_DEBUG_MODE ) {
+    error_reporting( E_ALL );
+    ini_set( 'display_errors', 1 );
+    ini_set( 'display_startup_errors', TRUE );
+  }
+  else {
+    error_reporting( 0 );
+    ini_set( 'display_errors', FALSE );
+    ini_set( 'display_startup_errors', FALSE );
+  }
+  // Anyway, log all errors.
+  ini_set( 'log_errors', TRUE );
+
+  // Reset some of PHP's configurations.
+  ini_set( 'mbstring.internal_encoding', 'UTF-8' );
+  ini_set( 'mbstring.func_overload', '7' );
+  ini_set( 'allow_url_fopen', '0' );
+  ini_set( 'register_globals', '0' );
+  ini_set( 'arg_separator.output', '&amp;' );
+  ini_set( 'url_rewriter.tags', '' );
+  ini_set( 'magic_quotes_gpc', '0' );
+  ini_set( 'magic_quotes_runtime', '0' );
+  ini_set( 'magic_quotes_sybase', '0' );
+
+  // Start sesion.
+  defined( 'TI_DISABLE_SESSION' ) or define( 'TI_DISABLE_SESSION', FALSE );
+  if ( !TI_DISABLE_SESSION ) {
+    _ti_session_start();
+  }
+
+  // Set default timezone.
+  date_default_timezone_set( TI_TIMEZONE );
+
+  // Set main locale.
+  setlocale( LC_CTYPE, TI_LOCALE );
+
+  // Set ti error handler.
+  set_error_handler( 'ti_error_handler' );
+
+  // Unregister globals.
+  unset( $_REQUEST, $_ENV, $HTTP_RAW_POST_DATA, $GLOBALS, $http_response_header, $argc, $argv );
+
+  // If is not cli and the REMOTE_ADDR is empty, then something is wrong.
+  if ( !is_cli() && empty( $_SERVER['REMOTE_ADDR'] ) ) {
+    error_log( 'ti-framework: Request from unknown user.' );
+    die( 'Permission denied' );
+  }
+
+  // Exit if favicon request detected.
+  if ( $_SERVER['REQUEST_URI'] === site_url( '/favicon.ico' )) {
+    header( 'Content-Type: image/vnd.microsoft.icon' );
+    header( 'Content-Length: 0' );
+    exit;
+  }
+
+  // Show documentation or continue with the app.
+  if ( defined('TI_DOCUMENTATION') && is_string( TI_DOCUMENTATION )
+    && TI_DOCUMENTATION && $_SERVER['REQUEST_URI'] === site_url( TI_DOCUMENTATION ) ) {
+    include TI_PATH_FRAMEWORK . '/documentation.php';
+    exit;
+  }
+
+  // Register autoloader function.
+  spl_autoload_register( 'ti_autoloader' );
+
+  // Register shutdown hook.
+  // @fire shutdown
+  register_shutdown_function( 'do_hook', 'shutdown' );
+
+  // Check for __application.php
+  if ( is_readable( TI_PATH_APP . '/' . TI_AUTOLOAD_FILE ) ) {
+    include TI_PATH_APP . '/' . TI_AUTOLOAD_FILE;
+  }
+
+  // Let boot the app.
+  Application( $_SERVER['REQUEST_URI'] );
 }
-else {
-  error_reporting( 0 );
-  ini_set( 'display_errors', FALSE );
-  ini_set( 'display_startup_errors', FALSE );
-}
-// Anyway, log all errors.
-ini_set( 'log_errors', TRUE );
-
-// Reset some of PHP's configurations.
-ini_set( 'mbstring.internal_encoding', 'UTF-8' );
-ini_set( 'mbstring.func_overload', '7' );
-ini_set( 'allow_url_fopen', '0' );
-ini_set( 'register_globals', '0' );
-ini_set( 'arg_separator.output', '&amp;' );
-ini_set( 'url_rewriter.tags', '' );
-ini_set( 'magic_quotes_gpc', '0' );
-ini_set( 'magic_quotes_runtime', '0' );
-ini_set( 'magic_quotes_sybase', '0' );
-
-// Determine if the request is ajax or not.
-define( 'TI_IS_AJAX', ( strtolower( ifsetor( $_SERVER['HTTP_X_REQUESTED_WITH'] ) == 'xmlhttprequest') ) );
-
-// Start sesion.
-defined( 'TI_DISABLE_SESSION' ) or define( 'TI_DISABLE_SESSION', FALSE );
-if ( !TI_DISABLE_SESSION ) {
-  _ti_session_start();
-}
-
-// Set default timezone.
-date_default_timezone_set( TI_TIMEZONE );
-
-// Set main locale.
-setlocale( LC_CTYPE, TI_LOCALE );
-
-// Set ti error handler.
-set_error_handler( 'ti_error_handler' );
-
-// Unregister globals.
-unset( $_REQUEST, $_ENV, $HTTP_RAW_POST_DATA, $GLOBALS, $http_response_header, $argc, $argv );
-
-// If is not cli and the REMOTE_ADDR is empty, then something is wrong.
-if ( !is_cli() && empty( $_SERVER['REMOTE_ADDR'] ) ) {
-  error_log( 'ti-framework: Request from unknown user.' );
-  die( 'Permission denied' );
-}
-
-// Exit if favicon request detected.
-if ( $_SERVER['REQUEST_URI'] === site_url( '/favicon.ico' )) {
-  header( 'Content-Type: image/vnd.microsoft.icon' );
-  header( 'Content-Length: 0' );
-  exit;
-}
-
-// Show documentation or continue with the app.
-if ( defined('TI_DOCUMENTATION') && is_string( TI_DOCUMENTATION )
-  && TI_DOCUMENTATION && $_SERVER['REQUEST_URI'] === site_url( TI_DOCUMENTATION ) ) {
-  include TI_PATH_FRAMEWORK . '/documentation.php';
-  exit;
-}
-
-// Register autoloader function.
-spl_autoload_register( 'ti_autoloader' );
-
-// Register shutdown hook.
-register_shutdown_function( 'do_hook', 'shutdown' );
-
-// Check for __application.php
-if ( is_readable( TI_PATH_APP . '/' . TI_AUTOLOAD_FILE ) ) {
-  include TI_PATH_APP . '/' . TI_AUTOLOAD_FILE;
-}
-
-// Let boot the app.
-$Application = Application( $_SERVER['REQUEST_URI'] );
 
 /**
  * @} End of "defgroup framework bootstrap".
