@@ -167,6 +167,7 @@ function _ti_session_start() {
  */
 function Application($url = '', $return = FALSE) {
 
+  // Flag for is it main or not main application query.
   static $is_main = TRUE;
 
   // If we have to return the rendered result, this is possible only for non-main urls.
@@ -199,18 +200,18 @@ function Application($url = '', $return = FALSE) {
   $url_args = array();
   do {
     $path = implode( '/', $url_segments );
-    $class = ucfirst( end( $url_segments ) ) . 'Controller';
+    $class = end( $url_segments ) . 'Controller';
 
     if ( $path && $class ) {
       $controller_path = TI_PATH_APP . '/' . TI_FOLDER_CONTROLLER . '/' . $path . TI_EXT_CONTROLLER;
       if ( is_readable( $controller_path )) {
         include_once $controller_path;
-        $is_main = FALSE;
         if ( ( $method = array_pop( $url_args ) ) === NULL ) {
           $method = 'Index';
         }
-        if ( class_exists( $class ) ) {
+        if ( class_exists( $class, FALSE ) ) {
           if ( method_exists( $class, $method ) ) {
+            $is_main = FALSE;
             $app = new $class;
             return call_user_func_array( array( $app, $method ), array_reverse( $url_args ) );
           }
@@ -220,7 +221,7 @@ function Application($url = '', $return = FALSE) {
           }
         }
         else {
-          error_log( 'ti-framework: controller ' . $class .' not exists.' );
+          error_log( 'ti-framework: controller class "' . $class .'" not exists.' );
           break;
         }
       }
@@ -234,7 +235,6 @@ function Application($url = '', $return = FALSE) {
     show_error( 'Controller error', 'The controller <strong>' . $url . '</strong> not exists.' );
   }
 }
-
 
 /**
  * Message Bus class
@@ -568,6 +568,9 @@ function site_url($url = '', $fullpath = FALSE) {
   }
 
   $url = base_url() . ( TI_DISABLE_MOD_REWRITE ? '?' : '' ) . $url;
+  if ( $url == '//' ) {
+    $url = '/';
+  }
 
   return do_hook( 'site_url', $url );
 }
@@ -1924,10 +1927,7 @@ function is_writable_real($filename = '') {
  * @return string
  */
 function make_hash($string = '') {
-  if ( !$string ) {
-    return '';
-  }
-  return md5( TI_APP_SECRET . str_rot13( CAST_TO_STRING( $string ) ) );
+  return str_rot13( md5( TI_APP_SECRET . CAST_TO_STRING( $string ) ) );
 }
 
 /**
@@ -2134,7 +2134,7 @@ function session_get($key = '', $fallback = NULL) {
  * @param string $id
  */
 function create_nonce($id = '') {
-  $n = make_hash( microtime() );
+  $n = substr( make_hash( microtime() ), 1, 6 );
   session_set( '_ti_nonce_' . make_hash( $id ), $n );
   return $n;
 }
@@ -2488,8 +2488,11 @@ function strip_attributes($html = '') {
  *
  * @param int $page_no
  *   current page number
- * @param int $entries
+ * @param int|array $entries
  *   total number of entries
+ *   or the array of the entries
+ * @param int per_page
+ *   how many entries are shown per page
  * @param string $base_url
  *   url to be used
  * @param bool $echo
@@ -2500,29 +2503,32 @@ function strip_attributes($html = '') {
  *
  * @return null|string
  */
-function paginate($page_no, $entries, $base_url = '', $echo = TRUE, $id = '') {
+function paginate($page_no, $entries, $per_page = 20, $base_url = '', $echo = TRUE, $id = '') {
 
   $conf = new stdClass;
   $conf->size = 10;
-  $conf->per_page = 20;
   $conf->html_cell_normal = '<a href="%s">%s</a>';
-  $conf->html_cell_active = '<a href="%s" class="active">%s</a>';
+  $conf->html_cell_active = '<a href="%s" class="current">%s</a>';
   $conf->html_cell_first = '<a href="%s">&#8592;</a>';
   $conf->html_cell_last = '<a href="%s">&#8594;</a>';
-  $conf->html_wrapper = '<div class="pagination">%s</div>';
 
   $hook_name = 'paginate' . ( $id ? '-' . $id : '' );
+
+  $conf->html_wrapper = '<div '. ( $id ? 'id="paginate-' . $id. '"' : '' ). ' class="paginate">%s</div>';
+
   $conf = do_hook( $hook_name, $conf );
 
-  if ( $conf->per_page >= $entries ) {
-    return FALSE;
+  $entries = is_array( $entries ) ? count( $entries ) : $entries;
+
+  $per_page = CAST_TO_INT( $per_page, 1 );
+
+  if ( $per_page >= $entries ) {
+    return NULL;
   }
 
   $html = '';
 
-  $conf->per_page = CAST_TO_INT( $conf->per_page, 1 );
-
-  $page_num_last = ceil( $entries / $conf->per_page );
+  $page_num_last = ceil( $entries / $per_page );
 
   if ( $page_no > $page_num_last ) {
     $page_no = $page_num_last;
@@ -2615,10 +2621,10 @@ function evalute_php($string, $local_variables = array(), $return = FALSE, &$res
   if ( $return ) {
     ob_start();
   }
-  extract( CAST_TO_ARRAY($local_variables) );
+  extract( CAST_TO_ARRAY( $local_variables ) );
   unset( $local_variables );
 
-  $result = eval( 'error_reporting(' . CAST_TO_INT(DEBUG_MODE) . ');?>' . $string . '<?php ');
+  $result = eval( 'error_reporting(' . CAST_TO_INT( DEBUG_MODE ) . ');?>' . $string . '<?php ');
 
   if ($return) {
     return ob_get_clean();
@@ -4572,7 +4578,7 @@ endif;
  */
 
 // Set the framework version.
-define( 'TI_FW_VERSION', '0.9.9.1' );
+define( 'TI_FW_VERSION', '0.9.9.2' );
 
 // Start the timer.
 define( 'TI_TIMER_START', microtime( TRUE ) );
@@ -4620,11 +4626,8 @@ defined( 'TI_FOLDER_CONTROLLER' )   or define( 'TI_FOLDER_CONTROLLER', 'www' );
 defined( 'TI_EXT_INC' )             or define( 'TI_EXT_INC', '.php' );
 defined( 'TI_EXT_VIEW' )            or define( 'TI_EXT_VIEW', '.html' );
 defined( 'TI_EXT_CONTROLLER' )      or define( 'TI_EXT_CONTROLLER', '.php' );
-define(  'TI_EXT_CONTROLLER_N',     strlen( TI_EXT_CONTROLLER ) * -1 );
 
 defined( 'TI_AUTOLOAD_FILE' )       or define( 'TI_AUTOLOAD_FILE', '__application.php' );
-defined( 'TI_AUTORENDER' )          or define( 'TI_AUTORENDER', TRUE );
-defined( 'TI_RULES_CACHE' )         or define( 'TI_RULES_CACHE', FALSE );
 defined( 'TI_FOLDER_CACHE' )        or define( 'TI_FOLDER_CACHE', 'cache' );
 
 // Fix server vars for $_SERVER['REQUEST_URI'].
