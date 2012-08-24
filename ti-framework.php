@@ -2291,17 +2291,12 @@ function has_hook($hook_name) {
  *
  * @return bool
  */
-function cache_put($key = '', $data = NULL) {
-
-  $file = md5( dirname($key) ) . md5( $key );
-
+function cache_set($key = '', $data = NULL) {
   $directory = TI_PATH_APP . '/' . TI_FOLDER_CACHE . '/';
-
   if ( !is_dir( $directory ) && !mkdir( $directory, 0700, TRUE )) {
     return FALSE;
   }
-
-  return file_put_contents( $directory . $file, CAST_TO_STRING( $data ) ) ? TRUE : FALSE;
+  return file_put_contents( $directory . md5( $key ), CAST_TO_STRING( $data ) ) ? TRUE : FALSE;
 }
 
 /**
@@ -2330,14 +2325,10 @@ function cache_get($key = '', $expire = '3600') {
  *   file to the cache file.
  */
 function cache_exists($key = '', $expire = '3600') {
-
-  $file = md5( dirname($key) ) . md5( $key );
-
-  $directory = TI_PATH_APP . '/' . TI_FOLDER_CACHE . '/';
-
-  if ( is_readable( $directory . $file ) ) {
-    if ( filemtime( $directory . $file ) < ( time() + $expire ) ) {
-      return $directory . $file;
+  $file = TI_PATH_APP . '/' . TI_FOLDER_CACHE . '/' . md5( $key );
+  if ( is_readable( $file ) ) {
+    if ( filemtime( $file ) < ( time() + $expire ) ) {
+      return $file;
     }
   }
 
@@ -2348,15 +2339,14 @@ function cache_exists($key = '', $expire = '3600') {
  * Delete cache for given key.
  *
  * @param string $key
+ *
+ * @return bool
  */
 function cache_delete($key = '') {
-
-  $file = TI_PATH_APP . '/' . TI_FOLDER_CACHE . '/' . md5( dirname( $key ) ) . '-' . md5( $key );
-
+  $file = TI_PATH_APP . '/' . TI_FOLDER_CACHE . '/' . md5( $key );
   if ( file_exists($file) ) {
     return unlink($file);
   }
-
   return TRUE;
 }
 
