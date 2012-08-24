@@ -181,6 +181,7 @@ function Application($url = '', $return = FALSE) {
   // Trim folder install from the url.
   $url = substr( $url, strlen( pathinfo( $_SERVER['PHP_SELF'], PATHINFO_DIRNAME ) ) );
 
+  // Apply the rules from url_rewrites.
   foreach ( do_hook( 'url_rewrites', array() ) as $rule => $rurl ) {
     if ( preg_match( '#^\/' . $rule . '$#i', $url ) ) {
       $url = preg_replace( '#^\/' . $rule . '$#i', $rurl, $url );
@@ -198,14 +199,30 @@ function Application($url = '', $return = FALSE) {
   $url_args = array();
   do {
     $path = implode( '/', $url_segments );
-    $class = 'Controller' . ucfirst( end( $url_segments ) );
+    $class = ucfirst( end( $url_segments ) ) . 'Controller';
 
     if ( $path && $class ) {
       $controller_path = TI_PATH_APP . '/' . TI_FOLDER_CONTROLLER . '/' . $path . TI_EXT_CONTROLLER;
       if ( is_readable( $controller_path )) {
+        include_once $controller_path;
         $is_main = FALSE;
-        $app = new TI_Application( $controller_path, array_reverse( $url_args ) );
-        return $app;
+        if ( ( $method = array_pop( $url_args ) ) === NULL ) {
+          $method = 'Index';
+        }
+        if ( class_exists( $class ) ) {
+          if ( method_exists( $class, $method ) ) {
+            $app = new $class;
+            return call_user_func_array( array( $app, $method ), array_reverse( $url_args ) );
+          }
+          else {
+            error_log( 'ti-framework: controller\'s method ' . $class . '->' . $method . '() not exists.' );
+            break;
+          }
+        }
+        else {
+          error_log( 'ti-framework: controller ' . $class .' not exists.' );
+          break;
+        }
       }
     }
   } while ( $url_args[]  = array_pop( $url_segments ) );
@@ -655,7 +672,7 @@ function redirect($url = NULL, $time_to_wait = 0) {
   }
 
   $url = site_url($url);
-  if (headers_sent()) {
+  if ( headers_sent() ) {
     echo
     '<html><head><title>Redirecting you...</title>',
     '<meta http-equiv="refresh" content="', $time_to_wait, ';url=', $url, '" />',
@@ -920,7 +937,7 @@ function set_document_downloadable($filename = '', $size = 0) {
     $filename = basename( $filename );
   }
   else {
-    if (!$size) {
+    if ( !$size ) {
       $size = 0;
     }
     $filename = basename( current_url() );
@@ -1401,34 +1418,6 @@ function array_model($array = array(), $model = array(), $strict_mode = TRUE) {
 }
 
 /**
- * Cast array elements to types.
- *
- * @param array|object|string $array
- * @param array|object|string $arry_types
- *
- * @return array
- */
-function array_cast($array = array(), $array_types = array()) {
-
-  $array = CAST_TO_ARRAY( $array );
-  $array_types = CAST_TO_ARRAY( $array_types );
-
-  $types = array('INT', 'FLOAT', 'DOUBLE', 'TIME', 'DATE', 'DATETIME', 'BOOL', 'ARRAY', 'OBJECT', 'BOOL');
-
-  foreach ( $array as $key => &$val ) {
-    if ( !empty($array_types[$key] ) ) {
-      $type = strtoupper($array_types[$key]);
-      if (in_array($type, $types)) {
-        $fn = 'CAST_TO_' . $type;
-        $val = $fn($val);
-      }
-    }
-  }
-
-  return $array;
-}
-
-/**
  * Check if array is associated or not
  *
  * @param array
@@ -1568,11 +1557,11 @@ function implode_r($glue = '', $pieces = array()) {
  * means the returner array, always will be $elements_number long.
  *
  * <?php
- *   print_r( explode_n(',', 'hello,world', 3, '' ) );
+ *   print_r( explode_n(',', 'hello,world', 3, 'x' ) );
  *   // array(
  *   //   0 => 'hello',
  *   //   1 => 'world',
- *   //   2 => '',
+ *   //   2 => 'x',
  *   // );
  * ?>
  *
@@ -1727,6 +1716,8 @@ function is_serialized($data) {
 /**
  * Get mimetype of the file
  *
+ * @fire filemime
+ *
  * @param string $file
  *   path to file
  * @param string $fallback_type
@@ -1736,26 +1727,27 @@ function is_serialized($data) {
  */
 function filemime($file = '', $fallback_type = 'application-octet/stream') {
 
+  $mime = $fallback_type;
   if (function_exists( 'finfo_open' ) ) {
     $finfo = finfo_open( FILEINFO_MIME );
     $mimetype = finfo_file( $finfo, $file );
     finfo_close( $finfo );
     $mimetype = explode( ';', $mimetype );
-    return array_shift( $mimetype );
+    $mime = array_shift( $mimetype );
   }
   elseif (function_exists( 'mime_content_type' )) {
-    return mime_content_type( $file );
+    $mime = mime_content_type( $file );
   }
   else {
     $it = exif_imagetype( $file );
     if ($it) {
-      return image_type_to_mime_type( $it );
+      $mime = image_type_to_mime_type( $it );
     }
     elseif (PHP_OS !== 'Windows') {
-      return exec('file -b --mime-type "' . escapeshellcmd( CAST_TO_STRING($file) ) . '"');
+      $mime = exec('file -b --mime-type "' . escapeshellcmd( CAST_TO_STRING($file) ) . '"');
     }
   }
-  return $fallback_type;
+  return do_hook( 'filemime', $mime, $file );
 }
 
 /**
@@ -1877,7 +1869,7 @@ function http_query($url, $method = 'GET', $data = NULL, $timeout = 30) {
   else {
     $fp = @fsockopen( $query['host'], $query['port'], $errno, $errstr, $timeout );
     if ( !$fp ) {
-      error_log( 'ti-framework: http_query:fsockopen[' . $errno . '] ' . $errstr );
+      error_log( 'ti-framework: http_query fsockopen[' . $errno . '] ' . $errstr );
       return FALSE;
     }
     else {
@@ -2492,7 +2484,7 @@ function strip_attributes($html = '') {
  * ?>
  *
  * @fire paginate
- * @fire paginate_$id
+ * @fire paginate-$id
  *
  * @param int $page_no
  *   current page number
@@ -2519,7 +2511,7 @@ function paginate($page_no, $entries, $base_url = '', $echo = TRUE, $id = '') {
   $conf->html_cell_last = '<a href="%s">&#8594;</a>';
   $conf->html_wrapper = '<div class="pagination">%s</div>';
 
-  $hook_name = 'paginate' . ( $id ? '_' . $id : '' );
+  $hook_name = 'paginate' . ( $id ? '-' . $id : '' );
   $conf = do_hook( $hook_name, $conf );
 
   if ( $conf->per_page >= $entries ) {
@@ -3397,9 +3389,9 @@ function transliterate($string = '', $from_latin = FALSE) {
  */
 
 /**
- * Main TI_Application class, provide a flexible MVC alike separation.
+ * The controller class, provide a controller for the MVC design pattern.
  */
-class TI_Application {
+class TI_Controller {
 
   /**
    * Store all variables for current instance.
@@ -3417,37 +3409,7 @@ class TI_Application {
    *
    * @var string
    */
-  private $__controller_path = '';
-
-  /**
-   * Store the arguments.
-   *
-   * @access private
-   *
-   * @var array
-   */
-  private $__arguments = array();
-
-  /**
-   * Class constructor.
-   *
-   * @param string $controller_path
-   * @param string $arguments
-   */
-  function __construct( $controller_path, $arguments ) {
-    $this->__controller_path = $controller_path;
-    $this->__arguments = $arguments;
-    $this->boot();
-  }
-
-  /**
-   * Include the controller.
-   *
-   * @access private
-   */
-  private function boot() {
-    include $this->__controller_path;
-  }
+  public $__controller_path = '';
 
   /**
    * Render the controller acording the view.
@@ -3467,26 +3429,7 @@ class TI_Application {
       }
     }
     show_error( 'View error', 'The view <strong>' . func_get_arg(0) . '</strong> not exists.' );
-  }
-
-  /**
-   * Get Nth argument or return NULL if it is not exists.
-   *
-   * @param int $n
-   *
-   * @return string|NULL
-   */
-  public function arg($n = 0) {
-    return isset( $this->__arguments[$n] ) ? $this->__arguments[$n] : NULL;
-  }
-
-  /**
-   * Get all arguments.
-   *
-   * @return array
-   */
-  public function args() {
-    return $this->__arguments;
+    error_log( 'ti-framework: view "' . $view . '" not exists.' );
   }
 
   /**
