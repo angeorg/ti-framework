@@ -4208,30 +4208,29 @@ class Image {
    *
    * @return boolean
    */
-  function output($quality = FALSE, $type = 'jpeg', $send_header = TRUE) {
+  function render($quality = FALSE, $type = 'jpeg', $send_header = TRUE) {
+    if ( $this->im ) {
+      switch ($type) {
+        case 'gif' :
+          if ( $send_header && !headers_sent()) {
+            header( 'Content-type: image/gif' );
+          }
+          return imagegif( $this->im, NULL );
 
-    switch ($type) {
-      case 'gif' :
-        if ( imagegif($this->im, NULL) ) {
-          if ( $send_header ) {
-            @header( 'Content-type: image/gif' );
+        case 'png' :
+          if ( $send_header && !headers_sent()) {
+            header( 'Content-type: image/png' );
           }
-          return TRUE;
-        }
-      case 'png' :
-        if ( imagepng($this->im, NULL, 8) ) {
-          if ( $send_header ) {
-            @header( 'Content-type: image/png' );
+          imagealphablending($this->im, true);
+          imagesavealpha($this->im, true);
+          return imagepng( $this->im, NULL, min( $quality, 9 ) );
+
+        default:
+          if ( $send_header && !headers_sent()) {
+            header( 'Content-type: image/jpeg' );
           }
-          return TRUE;
-        }
-      default:
-        if ( imagejpeg($this->im, NULL, ($quality ? $quality : $this->quality) )) {
-          if ( $send_header ) {
-            @header( 'Content-type: image/jpeg' );
-          }
-          return TRUE;
-        }
+          return imagejpeg( $this->im, NULL, ($quality ? $quality : $this->quality) );
+      }
     }
     return FALSE;
   }
@@ -4244,9 +4243,9 @@ class Image {
    *
    * @return string
    */
-  function get_output($quality = FALSE, $type = 'jpeg') {
+  function get_contents($quality = FALSE, $type = 'jpeg') {
     ob_start();
-    $this->output( $quality, $type, FALSE );
+    $this->render( $quality, $type, FALSE );
     return ob_get_clean();
   }
 
@@ -4413,8 +4412,7 @@ class Image {
    * @return bool
    */
   function rotate($rotate = 90) {
-
-    return (( $this->im = imagerotate($this->im, CAST_TO_INT($rotate), 0) ));
+    return (( $this->im = imagerotate($this->im, CAST_TO_INT($rotate),  imageColorAllocateAlpha( $this->im, 0, 0, 0, 127) ) ));
   }
 
   /**
@@ -4455,8 +4453,11 @@ class Image {
       $mark_y = imagesy( $this->im ) - 10 - $fontsize;
     }
 
-    return (bool) imagettftext( $this->im, $fontsize, 0, $mark_x, $mark_y, $black, $font, $text );
+    if ( is_readable( $font )) {
+      return FALSE;
+    }
 
+    return (bool) imagettftext( $this->im, $fontsize, 0, $mark_x, $mark_y, $black, $font, $text );
   }
 
   /**
@@ -4509,28 +4510,28 @@ class Image {
   /**
    * Convert current image to ascii.
    *
-   * @param bool $binary
-   *    create 1010 like ascii
+   * @param bool $html
+   *    return the html formated text
    *
    * @return string
    */
-  function to_ascii($binary = TRUE) {
+  function to_ascii($html = TRUE) {
 
     $text = '';
     $width = imagesx($this->im);
     $height = imagesy($this->im);
 
-    for ($h = 1; $h < $height; $h++) {
-      for ($w = 1; $w <= $width; $w++) {
+    for ($h = 0; $h < $height; $h++) {
+      for ($w = 0; $w < $width; $w++) {
         $rgb = imagecolorat($this->im, $w, $h);
         $r = ($rgb >> 16) & 0xFF;
         $g = ($rgb >> 8) & 0xFF;
         $b = $rgb & 0xFF;
-        if ($binary) {
+        if ( $html ) {
           $hex = '#' . str_pad( dechex( $r ), 2, '0', STR_PAD_LEFT )
           . str_pad( dechex( $g ), 2, '0', STR_PAD_LEFT )
           . str_pad( dechex( $b ), 2, '0', STR_PAD_LEFT );
-          if ($w == $width) {
+          if ($w+1 == $width) {
             $text .= '<br />';
           }
           else {
@@ -4543,6 +4544,9 @@ class Image {
           }
           else {
             $text .= '1';
+          }
+          if ($w+1 == $width) {
+            $text .= "\n";
           }
         }
       }
@@ -4623,6 +4627,21 @@ defined( 'TI_FOLDER_CACHE' )        or define( 'TI_FOLDER_CACHE', 'cache' );
 // Fix server vars for $_SERVER['REQUEST_URI'].
 _ti_fix_server_vars();
 
+// Exit if favicon request detected.
+if ( $_SERVER['REQUEST_URI'] === site_url( '/favicon.ico' )) {
+  header( 'Expires: ' . gmdate( 'D, d M Y H:i:s', time() + 60 * 60 ) . 'GMT' );
+  header( 'Content-Type: image/vnd.microsoft.icon' );
+  header( 'Content-Length: 0' );
+  exit;
+}
+
+// Show documentation or continue with the app.
+if ( defined('TI_DOCUMENTATION') && is_string( TI_DOCUMENTATION )
+    && TI_DOCUMENTATION && $_SERVER['REQUEST_URI'] === site_url( TI_DOCUMENTATION ) ) {
+  include TI_PATH_FRAMEWORK . '/documentation.php';
+  exit;
+}
+
 if ( !defined( 'TI_DISABLE_BOOT' )) {
 
   // Set debugging mode.
@@ -4674,31 +4693,22 @@ if ( !defined( 'TI_DISABLE_BOOT' )) {
     die( 'Permission denied' );
   }
 
-  // Exit if favicon request detected.
-  if ( $_SERVER['REQUEST_URI'] === site_url( '/favicon.ico' )) {
-    header( 'Content-Type: image/vnd.microsoft.icon' );
-    header( 'Content-Length: 0' );
-    exit;
-  }
-
-  // Show documentation or continue with the app.
-  if ( defined('TI_DOCUMENTATION') && is_string( TI_DOCUMENTATION )
-    && TI_DOCUMENTATION && $_SERVER['REQUEST_URI'] === site_url( TI_DOCUMENTATION ) ) {
-    include TI_PATH_FRAMEWORK . '/documentation.php';
-    exit;
-  }
-
   // Register autoloader function.
   spl_autoload_register( 'include_library' );
-
-  // Register shutdown hook.
-  // @fire shutdown
-  register_shutdown_function( 'do_hook', 'shutdown' );
 
   // Check for __application.php
   if ( is_readable( TI_PATH_APP . '/' . TI_AUTOLOAD_FILE ) ) {
     include TI_PATH_APP . '/' . TI_AUTOLOAD_FILE;
   }
+
+  // Do the init hook, ofcourse it is the same as executing code,
+  // in the autoloaded file, but with the hook is more elegance way.
+  // @fire init
+  do_hook( 'init' );
+
+  // Register shutdown hook.
+  // @fire shutdown
+  register_shutdown_function( 'do_hook', 'shutdown' );
 
   // Let boot the app.
   Application( $_SERVER['REQUEST_URI'] );
