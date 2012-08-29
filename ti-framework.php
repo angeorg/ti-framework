@@ -285,6 +285,8 @@ function mbus($text = '') {
  *   About mysql driver before PHP 5.3.6, ti-framework have
  *   built in competability for charset, so it is not ignored.
  *
+ * @see http://php.net/manual/en/class.pdo.php
+ *
  * @fire pdo_options
  *
  * @param string $db_id
@@ -293,7 +295,7 @@ function mbus($text = '') {
  *   db('1') return db object with config from TI_DB_1
  *   db('ib') return db object with config from TI_DB_ib
  *
- * @return PDO
+ * @return PDO|NULL
  */
 function db($db_id = '') {
 
@@ -432,36 +434,32 @@ function get_ip() {
 endif;
 
 /**
- * ti-framework class autoloader function.
+ * Load include file, also used by the framework's autoloader.
  *
- * @fire include_library
+ * @fire load_include
  *
  * @param string $library
  *
  * @return bool
  */
-function include_library($library = '') {
-
-  $library = strtolower( $library );
+function load_include($include = '') {
 
   $possible_files = array(
-      TI_PATH_APP . '/' . TI_FOLDER_INC . '/class-' . $library . TI_EXT_INC,
-      TI_PATH_APP . '/' . TI_FOLDER_INC . '/class.' . $library . TI_EXT_INC,
-      TI_PATH_APP . '/' . TI_FOLDER_INC . '/' . $library . TI_EXT_INC,
+      TI_PATH_APP . '/' . TI_FOLDER_INC . '/class-' . $include . TI_EXT_INC,
+      TI_PATH_APP . '/' . TI_FOLDER_INC . '/class.' . $include . TI_EXT_INC,
+      TI_PATH_APP . '/' . TI_FOLDER_INC . '/' . $include . TI_EXT_INC,
   );
 
-  $possible_files = do_hook( 'include_library', $possible_files, $library );
+  $possible_files = do_hook( 'load_include', $possible_files, $include );
 
   foreach ( $possible_files as $file ) {
     if ( is_readable( $file ) ) {
       include_once( $file );
       return TRUE;
     }
-  }
-
-  if ( !class_exists( $library ) ) {
-    show_error( 'System error', 'Library <strong>' . $library . '</strong> not exists.' );
-    return FALSE;
+    else {
+      show_error( 'System error', 'Include <strong>' . $include . '</strong> not exists.' );
+    }
   }
 
 }
@@ -2102,7 +2100,7 @@ function session_set($key = '', $value = '') {
     return TRUE;
   }
 
-  return ($_SESSION[CAST_TO_STRING($key)] = $value);
+  return ($_SESSION[$key] = $value);
 }
 
 /**
@@ -2123,7 +2121,6 @@ function session_get($key = '', $fallback = NULL) {
     return $result;
   }
   else {
-    $key = CAST_TO_STRING($key);
     return isset( $_SESSION[$key] ) ? $_SESSION[$key] : $fallback;
   }
 }
@@ -2134,21 +2131,28 @@ function session_get($key = '', $fallback = NULL) {
  * @param string $id
  */
 function create_nonce($id = '') {
-  $n = substr( make_hash( microtime() ), 1, 6 );
-  session_set( '_ti_nonce_' . make_hash( $id ), $n );
-  return $n;
+  $key = make_hash( $id );
+  $nonce = session_get( '_ti_nonce-' . $key );
+  if ( $nonce ) {
+    return $nonce;
+  }
+  else {
+    $nonce = substr( make_hash( microtime() ), 1, 8 );
+    session_set( '_ti_nonce-' . $key, $nonce );
+    return $nonce;
+  }
 }
 
 /**
  * Check nonce.
  *
- * @param string $id
  * @param string $nonce_key
+ * @param string $id
  *
  * @return bool
  */
-function check_nonce($id = '', $nonce_key = '') {
-  return ( strcmp( CAST_TO_STRING($nonce_key), session_get('_ti_nonce_' . make_hash( $id )) === 0));
+function check_nonce($nonce_key = '', $id = '') {
+  return ( strcmp( $nonce_key, session_get( '_ti_nonce-' . make_hash( $id ) ) ) === 0 );
 }
 
 /**
@@ -2469,7 +2473,7 @@ function strip_attributes($html = '') {
  * Build HTML paginate links for page.
  *
  * <?php
- *   // Example simple ussage:
+ *   // Example usage:
  *   echo paginate( $page, $entries->getTotal(), 'articles/page/%s' );
  * ?>
  *
@@ -2497,6 +2501,7 @@ function paginate($page_no, $entries, $per_page = 20, $base_url = '', $echo = TR
 
   $conf = new stdClass;
   $conf->size = 10;
+  $conf->id = $id;
   $conf->html_cell_normal = '<a href="%s">%s</a>';
   $conf->html_cell_active = '<a href="%s" class="current">%s</a>';
   $conf->html_cell_first = '<a href="%s">&#8592;</a>';
@@ -2504,9 +2509,12 @@ function paginate($page_no, $entries, $per_page = 20, $base_url = '', $echo = TR
 
   $hook_name = 'paginate' . ( $id ? '-' . $id : '' );
 
-  $conf->html_wrapper = '<div '. ( $id ? 'id="paginate-' . $id. '"' : '' ). ' class="paginate">%s</div>';
+  $conf->html_wrapper = '<div '. ( $id ? 'id="paginate-' . $id. '" ' : '' ). 'class="paginate">%s</div>';
 
-  $conf = do_hook( $hook_name, $conf );
+  $conf = do_hook( 'paginate', $conf );
+  if ( $id ) {
+    $conf = do_hook( $hook_name, $conf );
+  }
 
   $entries = is_array( $entries ) ? count( $entries ) : $entries;
 
@@ -2597,110 +2605,97 @@ function paginate($page_no, $entries, $per_page = 20, $base_url = '', $echo = TR
 }
 
 /**
- * Generate the calendar's html
+ * Build HTML Calendar structure.
  *
- * @access public
+ * <?php
+ *   // Example usage:
+ *   echo calendar( '2012-12-12', '', TRUE, '123' );
+ * ?>
  *
- * @param date $current_date
+ * @fire calendar
+ * @fire calendar-$id
  *
- * @return Calendar
+ * @param string $current_date
+ * @param callback $content_callback
+ * @param bool $echo
+ * @param string $id
+ *
+ * @return null|string
  */
-function calendar($current_date = '', $base_url = 'archive/%Y-%m-%d', $link_all_days = TRUE, $events = array(), $echo = TRUE, $id = '') {
+function calendar($current_date = '', $content_callback = '', $echo = TRUE, $id = '') {
 
   $conf = new stdClass;
   $conf->id = $id;
-  $conf->first_is_monday = FALSE;
-  $conf->show_weekday_names = TRUE;
+  $conf->monday_is_first = TRUE;
+  $conf->show_weekdays = TRUE;
 
-  $conf->html_wrap = '<table class="table-calendar">%calendar</table>';
-  $conf->html_row = '<tr>%cells</tr>';
-
-  $conf->html_row_weekdays = '<tr>%cells</tr>';
-  $conf->html_cell_weekday = '<th class="%class">%name</th>';
-
-  $conf->html_cell_other= '<th class="%class">%name</th>';
-
-  $conf->html_cell_empty = '<td class="%class"><a href="%url">%day</a>';
-  $conf->html_cell_events = '<td class="%class"><a href="%url" title="' . __( 'There is %s events on this date' ) . '">%day</a>';
-
-  $conf->events &= $events;
+  $conf->html_week_start_tag = '<tr>';
+  $conf->html_week_end_tag = '</tr>';
+  $conf->html_day_start_tag = '<td%s>';
+  $conf->html_day_end_tag = '</td>';
 
   $hook_name = 'calendar' . ( $id ? '-' . $id : '' );
-  $conf->html_wrapper = '<table id="' . $hook_name .  '" class="calendar">%s</div>';
+
+  $conf->html_wrapper = '<table '. ( $id ? 'id="calendar-' . $id. '" ' : '' ). 'class="calendar">%s</table>';
+
   $conf = do_hook( 'calendar', $conf );
-  $conf = do_hook( $hook_name, $conf );
+  if ( $id ) {
+    $conf = do_hook( $hook_name, $conf );
+  }
 
-  $html = '';
+  list( $y, $m, $d) = sscanf( $current_date, '%d-%d-%d' );
 
-  list($y, $m, $d) = sscanf($current_date, '%d-%d-%d');
   if ( !$y ) {
-    gmdate( 'Y' );
+    $y = gmdate( 'Y' );
   }
   if ( !$m ) {
-    gmdate( 'm' );
+    $m = gmdate( 'm' );
   }
   if ( !$d ) {
-    gmdate( 'd' );
+    $d = gmdate( 'd' );
   }
 
+  $timestamp = gmmktime( 0, 0, 0, $m, 1, $y);
+  $maxday = gmdate( 't', $timestamp );
+  $startday = gmdate( 'w', $timestamp );
   $html = '';
 
-  $html_row = '';
-  if ( $conf->show_weekday_names) {
-    $timestamp = strtotime('next ' . ($conf->first_is_monday ? 'Monday' : 'Sunday') );
-    $days = array();
-    for ($i = 0; $i < 7; $i++) {
-      $html_row .= strtr( $conf->html_cell_weekday, array(
-        '%name' => __( strftime( '%a', $timestamp ) ),
-        '%class' => 'weekday-' . $i,
-      ));
-      $timestamp = strtotime('+1 day', $timestamp);
+  for ( $i=0; $i < ($maxday+$startday); $i++ ) {
+
+    $wday = $i%7;
+    if ( $wday == ($conf->monday_is_first ? 1 : 0) ) {
+      $html .= $conf->html_week_start_tag;
     }
-    $html .= strtr( $conf->html_row_weekdays, array(
-      '%cells' => $html_row,
-    ));
-  }
 
-  $month_first_time = gmmktime( 0, 0, 0, $m, 1, $y );
-  $month_days = gmdate('t', $month_first_time );
-  $day = 1;
-  $w = (int) gmdate( 'w', $month_first_time );
-  $day = gmdate('t', gmmktime( 0, 0, 0, $m, -1, $y ) ) - $w+1;
-  $html_row = '';
-  for ( $weekday = 0; $weekday < $w; $weekday++, $day++ ) {
-    $html_row .= sprintf( $conf->html_cell_other, $day );
-  }
-  unset($w);
-  for ( $day = 1; $day <= $month_days; $day++ ) {
-
-    $classes = array( 'day-' . $day, 'weekday-' . $weekday );
-    $html_row .= strtr( $conf->html_cell_empty_normal, array(
-      '%day' => $day,
-      '%url' => site_url( strftime( $base_url, strtotime( $y . '-' . $m . '-' . $d ) ) ),
-      '%class' => implode( ' ', $classes ),
-    ));
-
-    if ($weekday >= 6) {
-      $weekday = 0;
-      $html .= sprintf( $conf->html_row, $html_row );
-      $html_row = '';
+    if ( $i < $startday ) {
+      $day = NULL;
+    }
+    if ( $i < $startday ) {
+      $day = NULL;
+      $date = NULL;
+      $markup = sprintf( $conf->html_day_start_tag, '' ) . '&nbsp;' . $conf->html_day_end_tag;
     }
     else {
-      $weekday++;
+      $day = $i - $startday + 1;
+      $date = $y . '-' . $m . '-' . $day;
+      $markup = sprintf( $conf->html_day_start_tag, 'class="day day-' . $date . ' weekday-' . $wday . '"' ) . $day . $conf->html_day_end_tag;
     }
-  }
-  if ( $weekday ) {
-    for ( $day = 1; $weekday <= 6; $weekday++, $day++ ) {
-      $html_row .= sprintf( $conf->html_cell_other, $day );
+    if ( $content_callback && is_callable( $content_callback ) ) {
+      $markup = call_user_func_array( $content_callback, array( $markup, $day, $wday, $date ) );
     }
-    $html .= $html_row;
+    $html .= $markup;
+    if ( $wday == ($conf->monday_is_first ? 7 : 6) ) {
+      $html .= $conf->html_week_end_tag;
+    }
   }
 
   if ( !$html ) {
     return '';
   }
 
-  $html = str_replace( '%cells', $html );
+  if ( strpos( $conf->html_wrapper, '%s' ) !== FALSE ) {
+    $html = sprintf( $conf->html_wrapper, $html );
+  }
 
   if ( $echo ) {
     echo $html;
@@ -2708,150 +2703,6 @@ function calendar($current_date = '', $base_url = 'archive/%Y-%m-%d', $link_all_
   else {
     return $html;
   }
-
-
-exit;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  $current_date = explode('-', $current_date);
-
-  if (!$current_date[0]) {
-    $current_date[0] = date('Y');
-  }
-
-  if (!isset($current_date[1])) {
-    $current_date[1] = date('m');
-  }
-
-  if (!isset($current_date[2])) {
-    $current_date[2] = date('d');
-  }
-
-  $Y = str_pad( CAST_TO_INT( $current_date[0] ), 4, 0, STR_PAD_LEFT );
-  $M = str_pad( CAST_TO_INT( $current_date[1], 1, 12 ), 2, 0, STR_PAD_LEFT );
-  $D = str_pad( CAST_TO_INT( $current_date[2], 1, 31 ), 2, 0, STR_PAD_LEFT );
-
-  $day_weekday = date( 'w', mktime( 0, 0, 0, $M, 1, $Y ) );
-  if ( $day_weekday === 0 ) {
-    $day_weekday = 7;
-  }
-
-  $html_row = '';
-  if ( $conf->show_weekday_names) {
-    $timestamp = strtotime('next ' . ($conf->first_is_monday ? 'Monday' : 'Sunday') );
-    $days = array();
-    for ($i = 0; $i < 7; $i++) {
-      $html_row .= '<th>' . strftime('%a', $timestamp) . '</th>';
-      $timestamp = strtotime('+1 day', $timestamp);
-    }
-    $html .= sprintf( $conf->html_row, $html_row );
-  }
-
-  for ($i = 1; $i < ($conf->first_is_monday ? $day_weekday : $day_weekday + 1); $i++) {
-    #$html .= '<td class="hidden">&nbsp;</td>';
-  }
-
-  $month_days = date('t', mktime(0, 0, 0, $M, 1, $Y));
-
-  $html_row = '';
-  for ($i = 1; $i <= $month_days; $i++) {
-
-    $date = $Y . '-' . $M . '-' . $i;
-    $link = site_url( strftime( $base_url, strtotime( $date ) ) );
-
-    if ( isset( $conf->events_dates[$date] ) ) {
-      $events = count( $conf->events_dates[$date] );
-    }
-    else {
-      $events = 0;
-    }
-
-    $title = $events ? sprintf( __( 'Events on this date - %d.' ), $events ) : __( 'There is no events on this date' );
-
-    if ( $link_all_days ) {
-      $html_row .= '<td><a href="' . $link . '" title="' . $title . '">' . $i . '</a></td>';
-    }
-    elseif ( $events ) {
-      $html_row .='<td><a href="' . $link . '" title="' . $title . '">' . $i . '</a></td>';
-    }
-    else {
-      $html_row .='<td>' . $i . '</td>';
-    }
-
-    if ( $conf->first_is_monday ) {
-      if ( $day_weekday === 7 ) {
-        $html .= sprintf( $conf->html_row, $html_row );
-        $html_row = '';
-        $day_weekday = 1;
-        continue;
-      }
-    }
-    else {
-      if ( $day_weekday === 7 ) {
-        $day_weekday = 1;
-        continue;
-      }
-      elseif ( $day_weekday === 6 ) {
-        $html .= sprintf( $conf->html_row, $html_row );
-        $html_row = '';
-      }
-    }
-    $day_weekday++;
-  }
-
-  echo $html;
-  return;
-
-  for (; $day_weekday <= ( $conf->first_is_monday ? 7 : 6 ); $day_weekday++ ) {
-    $html .= '<td>&nbsp;</td>';
-  }
-
-  $html .= '</tr>';
-
 
 }
 
@@ -3756,6 +3607,8 @@ class TI_Controller {
 
 /**
  * Database wraper class for PDO
+ *
+ * @see http://php.net/manual/en/class.pdo.php
  */
 class TI_Database extends PDO {
 
@@ -4118,6 +3971,21 @@ class Image {
   private $im = NULL;
 
   /**
+   * If parameter passed, then the class will try to load the,
+   * filepath, same like the Image::load_from_file().
+   *
+   * @param string $filename
+   *
+   * @return bool|$this
+   */
+  function __construct($filename = '') {
+    if ( $filename ) {
+      return $this->load_from_file( $filename );
+    }
+    return $this;
+  }
+
+  /**
    * Load image for manipulation from existing file on the filesystem.
    *
    * @param string $filename
@@ -4184,7 +4052,6 @@ class Image {
    * @return boolean
    */
   function load_from_string($content = '') {
-
     if ( $content && is_string( $content ) && ($i = imagecreatefromstring( $content ) ) ) {
       $this->im = $i;
       return TRUE;
@@ -4204,7 +4071,6 @@ class Image {
    * @return boolean
    */
   function save_to_file($filename, $quality = FALSE, $permissions = NULL) {
-
     if ( imagejpeg($this->im, $filename, ( $quality ? $quality : $this->quality)) ) {
       if ($permissions !== NULL) {
         chmod($filename, $permissions);
@@ -4625,7 +4491,7 @@ if ( version_compare( PHP_VERSION, '5.2.0', '<' ) ) {
 }
 
 // Define NL (new line) constant.
-defined( 'NL' ) or define('NL', "\n");
+defined( 'NL' ) or define( 'NL', "\n" );
 
 // Set path framework.
 define( 'TI_PATH_FRAMEWORK', pathinfo( __FILE__, PATHINFO_DIRNAME ) );
@@ -4676,7 +4542,6 @@ if ( $_SERVER['REQUEST_URI'] === site_url( '/favicon.ico' )) {
   header( 'Content-Length: 0' );
   exit;
 }
-
 // Show documentation or continue with the app.
 if ( defined('TI_DOCUMENTATION') && is_string( TI_DOCUMENTATION )
     && TI_DOCUMENTATION && $_SERVER['REQUEST_URI'] === site_url( TI_DOCUMENTATION ) ) {
@@ -4728,7 +4593,7 @@ if ( !defined( 'TI_DISABLE_BOOT' )) {
   set_error_handler( 'ti_error_handler' );
 
   // Unregister globals.
-  unset( $_REQUEST, $_ENV, $HTTP_RAW_POST_DATA, $GLOBALS, $http_response_header, $argc, $argv );
+  unset( $_REQUEST, $_ENV, $HTTP_RAW_POST_DATA, $GLOBALS, $argc, $argv );
 
   // If is not cli and the REMOTE_ADDR is empty, then something is wrong.
   if ( !is_cli() && empty( $_SERVER['REMOTE_ADDR'] ) ) {
@@ -4737,7 +4602,7 @@ if ( !defined( 'TI_DISABLE_BOOT' )) {
   }
 
   // Register autoloader function.
-  spl_autoload_register( 'include_library' );
+  spl_autoload_register( 'load_include' );
 
   // Check for __application.php
   if ( is_readable( TI_PATH_APP . '/' . TI_AUTOLOAD_FILE ) ) {
@@ -4752,7 +4617,6 @@ if ( !defined( 'TI_DISABLE_BOOT' )) {
   // Register shutdown hook.
   // @fire shutdown
   register_shutdown_function( 'do_hook', 'shutdown' );
-
   // Let boot the app.
   Application( $_SERVER['REQUEST_URI'] );
 }
