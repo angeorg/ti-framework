@@ -783,6 +783,8 @@ function po_to_array($file = '') {
  * msgid "string"
  * msgstr "String"
  *
+ * @global $_LOCALE
+ *
  * @param string $locale
  *   locale name
  *
@@ -1092,13 +1094,13 @@ function ti_error_handler($errno, $errstr, $errfile, $errline) {
   if ( !TI_DEBUG_MODE ) {
     return TRUE;
   }
-
-  else
+  else {
     echo
     '<div style="border:1px dotted red;" class="ti_error_handler">',
     '<p><strong>[', $errno, ']</strong> ', $errstr, '</p>',
     '<p><strong>[', $errline, '] ', $errfile, '</strong></p>',
     '</div>';
+  }
 }
 
 /**
@@ -1291,10 +1293,10 @@ function CAST_TO_BOOL($var = FALSE) {
  * @return string
  */
 function CAST_TO_STRING($var = '', $length = FALSE, $implode_arrays = ' ') {
-  if ( is_array($var) || is_object($var) ) {
+  if ( is_array ($var ) || is_object( $var ) ) {
     $var = implode_r( $implode_arrays, $var );
   }
-  else if ( is_resource($var) ) {
+  else if ( is_resource($var ) ) {
     $var = '';
   }
   $var = (string) $var;
@@ -1451,7 +1453,6 @@ function array_get_element($array = array(), $element = 0, $fallback = NULL) {
  * @return array
  */
 function array_group_by($array = array(), $key = 0) {
-
   if (!$key) {
     return $array;
   }
@@ -1597,24 +1598,20 @@ function explode_n($delimeter = ',', $string = '', $elements_number = 1, $defaul
  * @param int $file_permission
  *
  * @return int
- *   count file copied
+ *   count of total copied files
  */
 function copydir($source, $destination, $directory_permission = 0755, $file_permission = 0755) {
-
   $cf = 0;
   if ( !is_dir($source) ) {
     return 0;
   }
   $dir = opendir($source);
-
   if ( !is_dir( $destination ) || !mkdir( $destination, $directory_permission, TRUE )) {
     return 0;
   }
-
   if ( !$dir ) {
     return 0;
   }
-
   while ( FALSE !== ( $file = readdir( $dir ) ) ) {
     if ( $file != '.' && $file != '..' ) {
       if ( is_dir( $source . '/' . $file ) ) {
@@ -1643,19 +1640,14 @@ function copydir($source, $destination, $directory_permission = 0755, $file_perm
  *   list with matched files
  */
 function find_file($directory = '.', $pattern = '', $skip_hidden = TRUE) {
-
   $list = array();
-
   if ( !( $dir = opendir( $directory ) ) ) {
     return $list;
   }
-
   while ( FALSE !== ($file = readdir( $dir)) ) {
-
     if ( $skip_hidden && $file{0} == '.' ) {
       continue;
     }
-
     if ( is_dir( $directory . '/' . $file ) ) {
       $list += find_file( $directory . '/' . $file, $pattern, $skip_hidden );
     }
@@ -2066,7 +2058,6 @@ endif;
  */
 function cookie_set($name, $value = '', $expire = 0, $path = '', $domain = '', $secure = FALSE, $httponly = FALSE) {
   $value = CAST_TO_STRING($value);
-
   $_COOKIE[$name] = $value;
   return setcookie($name, $value, $expire, $path, $domain, $secure, $httponly);
 }
@@ -2092,7 +2083,6 @@ function cookie_get($name, $fallback = NULL) {
  * @return bool
  */
 function session_set($key = '', $value = '') {
-
   if (is_array($key) || is_object($key)) {
     foreach ($key as $k => $v) {
       session_set($k, $v);
@@ -2112,7 +2102,6 @@ function session_set($key = '', $value = '') {
  * @return mixed
  */
 function session_get($key = '', $fallback = NULL) {
-
   if (is_array($key) || is_object($key)) {
     $result = array();
     foreach ($key as $k) {
@@ -2172,6 +2161,8 @@ function check_nonce($nonce_key = '', $id = '') {
  *     return $content . ' :)';
  *   });
  * ?>
+ *
+ * @global $_HOOKS
  *
  * @param string $hook_name
  * @param string|callback $function_name
@@ -3896,25 +3887,25 @@ class TI_Messagebus {
    *
    * @access public
    *
-   * @param string $Text
-   * @param string $Title
-   * @param string $Class
-   * @param array|object $Attributes
+   * @param string $text
+   * @param string $title
+   * @param string $class
+   * @param array|object|string $attributes
    *
    * @return boolean
    */
-  public function add($Text = '', $Title = '', $Class = '', $Attributes = array()) {
+  public function add($text = '', $title = '', $class = '', $attributes = array()) {
 
-    $Attributes = CAST_TO_OBJECT( $Attributes );
+    $attributes = CAST_TO_OBJECT( $attributes );
 
     $o = new stdClass;
-    $o->Title = strip_tags( CAST_TO_STRING($Title) );
-    $o->Text = strip_tags( CAST_TO_STRING( $Text ), $this->allowed_html_tags );
-    $o->Class = htmlentities( CAST_TO_STRING($Class) );
-    $o->Attributes = $Attributes;
+    $o->title = strip_tags( CAST_TO_STRING($title) );
+    $o->text = strip_tags( CAST_TO_STRING( $text ), $this->allowed_html_tags );
+    $o->class = htmlentities( CAST_TO_STRING($class) );
+    $o->attributes = $attributes;
 
     $m = session_get( '_ti_mbus' );
-    if ( !is_array($m )) {
+    if ( !is_array( $m )) {
       $m = array();
     }
     $m[] = $o;
