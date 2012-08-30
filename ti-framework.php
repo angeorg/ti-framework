@@ -50,7 +50,7 @@
  * @return void
  */
 function _ti_fix_server_vars() {
-  // Correct the requested URL
+  // Correct the requested URL.
   if ( TI_DISABLE_MOD_REWRITE ) {
     if ( empty($_SERVER['REQUEST_URI']) ) {
       $_SERVER['REQUEST_URI'] = '/';
@@ -60,7 +60,7 @@ function _ti_fix_server_vars() {
     // Fix server vars, all credits to WordPress team.
     $_SERVER = array_merge( array('SERVER_SOFTWARE' => '', 'REQUEST_URI' => ''), $_SERVER );
 
-    // Fix for IIS when running with PHP ISAPI
+    // Fix for IIS when running with PHP ISAPI.
     if ( empty( $_SERVER['REQUEST_URI'] ) ||
         ( php_sapi_name() != 'cgi-fcgi' && preg_match( '/^Microsoft-IIS\//', $_SERVER['SERVER_SOFTWARE'] ) ) ) {
 
@@ -73,7 +73,7 @@ function _ti_fix_server_vars() {
         $_SERVER['REQUEST_URI'] = $_SERVER['HTTP_X_REWRITE_URL'];
       }
       else {
-        // Use ORIG_PATH_INFO if there is no PATH_INFO
+        // Use ORIG_PATH_INFO if there is no PATH_INFO.
         if ( !isset( $_SERVER['PATH_INFO'] ) && isset( $_SERVER['ORIG_PATH_INFO'] ) ) {
           $_SERVER['PATH_INFO'] = $_SERVER['ORIG_PATH_INFO'];
         }
@@ -88,7 +88,7 @@ function _ti_fix_server_vars() {
           }
         }
 
-        // Append the query string if it exists and isn't null
+        // Append the query string if it exists and isn't null.
         if ( ! empty( $_SERVER['QUERY_STRING'] ) ) {
           $_SERVER['REQUEST_URI'] .= '?' . $_SERVER['QUERY_STRING'];
         }
@@ -101,12 +101,12 @@ function _ti_fix_server_vars() {
       $_SERVER['SCRIPT_FILENAME'] = $_SERVER['PATH_TRANSLATED'];
     }
 
-    // Fix for Dreamhost and other PHP as CGI hosts
+    // Fix for Dreamhost and other PHP as CGI hosts.
     if ( strpos( $_SERVER['SCRIPT_NAME'], 'php.cgi' ) !== FALSE ) {
       unset( $_SERVER['PATH_INFO'] );
     }
 
-    // Fix empty PHP_SELF
+    // Fix empty PHP_SELF.
     $PHP_SELF = $_SERVER['PHP_SELF'];
     if ( empty( $PHP_SELF ) ) {
       $_SERVER['PHP_SELF'] = $PHP_SELF = preg_replace( '/(\?.*)?$/', '', $_SERVER["REQUEST_URI"] );
@@ -1858,7 +1858,7 @@ function http_query($url, $method = 'GET', $data = NULL, $timeout = 30) {
     curl_close($ch);
     return $response;
   }
-  // Fallback to fsockopen
+  // Fallback to fsockopen.
   else {
     $fp = @fsockopen( $query['host'], $query['port'], $errno, $errstr, $timeout );
     if ( !$fp ) {
@@ -2603,13 +2603,28 @@ function paginate($page_no, $entries, $per_page = 20, $base_url = '', $echo = TR
  *   echo calendar( '2012-12-12', '', TRUE, '123' );
  * ?>
  *
+ * Configuration that can be changed via hooks:
+ *
+ * stdClass Object
+ * (
+ *   [id] => <string the id>
+ *   [monday_is_first] => <boolean>
+ *   [show_weekdays] => <boolean>
+ *   [show_weekdays_long_names] => <boolean>
+ * )
+ *
  * @fire calendar
  * @fire calendar-$id
  *
  * @param string $current_date
+ *   if empty string is passed, then get current date
  * @param callback $content_callback
- * @param bool $echo
+ *   if empty string or noncallable argument is passed, then just show date
+  * @param bool $echo
+ *   return or echo the generated html
  * @param string $id
+ *   used only when need to customize,
+ *   specific paginate section by this id and hook paginate
  *
  * @return null|string
  */
@@ -2617,13 +2632,9 @@ function calendar($current_date = '', $content_callback = '', $echo = TRUE, $id 
 
   $conf = new stdClass;
   $conf->id = $id;
-  $conf->monday_is_first = TRUE;
+  $conf->monday_is_first = FALSE;
   $conf->show_weekdays = TRUE;
-
-  $conf->html_week_start_tag = '<tr>';
-  $conf->html_week_end_tag = '</tr>';
-  $conf->html_day_start_tag = '<td%s>';
-  $conf->html_day_end_tag = '</td>';
+  $conf->show_weekdays_long_names = FALSE;
 
   $hook_name = 'calendar' . ( $id ? '-' . $id : '' );
 
@@ -2649,39 +2660,66 @@ function calendar($current_date = '', $content_callback = '', $echo = TRUE, $id 
   $timestamp = gmmktime( 0, 0, 0, $m, 1, $y);
   $maxday = gmdate( 't', $timestamp );
   $startday = gmdate( 'w', $timestamp );
+
   $html = '';
+  if ( $conf->monday_is_first ) {
+    $startday--;
+  }
+  if ( $startday < 0 ) {
+    $startday = 6;
+  }
 
-  for ( $i=0; $i < ($maxday+$startday); $i++ ) {
+  $restofmonth = 0;
+  for ( $i=0; $i < ( $maxday + $startday + $restofmonth ); $i++ ) {
 
-    $wday = $i%7;
-    if ( $wday == ($conf->monday_is_first ? 1 : 0) ) {
-      $html .= $conf->html_week_start_tag;
+    if ( $i%7 == 0 ) {
+      $html .= '<tr>';
     }
 
-    if ( $i < $startday ) {
-      $day = NULL;
+    $day = $i - $startday + 1;
+    if ( $day < 1 || $day > $maxday ) {
+      $html .= '<td>&nbsp;</td>';
     }
-    if ( $i < $startday ) {
-      $day = NULL;
-      $date = NULL;
-      $markup = sprintf( $conf->html_day_start_tag, '' ) . '&nbsp;' . $conf->html_day_end_tag;
-    }
+
     else {
-      $day = $i - $startday + 1;
       $date = $y . '-' . $m . '-' . $day;
-      $markup = sprintf( $conf->html_day_start_tag, 'class="day day-' . $date . ' weekday-' . $wday . '"' ) . $day . $conf->html_day_end_tag;
+      $html .= '<td class="day day-' . $date . ' weekday-' . $i%7 . '">';
+      if ( $content_callback && is_callable( $content_callback )) {
+        $html .= call_user_func_array( $content_callback, array( $day, $wday, $date ) );
+      }
+      else {
+        $html .= $day;
+      }
+      $html .= '</td>';
     }
-    if ( $content_callback && is_callable( $content_callback ) ) {
-      $markup = call_user_func_array( $content_callback, array( $markup, $day, $wday, $date ) );
+    if ( $restofmonth === 0 && $day >= $maxday ) {
+      $restofmonth = 6 - $i%7;
     }
-    $html .= $markup;
-    if ( $wday == ($conf->monday_is_first ? 7 : 6) ) {
-      $html .= $conf->html_week_end_tag;
+    if ( $i%7 == 6 ) {
+      $html .= '</tr>';
     }
   }
 
   if ( !$html ) {
     return '';
+  }
+
+  $html = '<tbody>' . $html . '</tbody>';
+
+  if ( $conf->show_weekdays ) {
+    $weekdays_html = '';
+    if ( $conf->monday_is_first ) {
+      for ( $i = 1; $i < 7; $i++ ) {
+        $weekdays_html .= '<th class="weekday-' . $i . '">' . __( num_to_weekday( $i, $conf->show_weekdays_long_names ) ). '</th>';
+      }
+      $weekdays_html .= '<th class="weekday-0">' . __( num_to_weekday( 0, $conf->show_weekdays_long_names ) ) . '</th>';
+    }
+    else {
+      for ( $i = 0; $i < 7; $i++ ) {
+        $weekdays_html .= '<th class="weekday-' . $i . '">' . __( num_to_weekday( $i, $conf->show_weekdays_long_names ) ) . '</th>';
+      }
+    }
+    $html = '<thead>' . $weekdays_html . '</thead>' . $html;
   }
 
   if ( strpos( $conf->html_wrapper, '%s' ) !== FALSE ) {
@@ -2694,7 +2732,6 @@ function calendar($current_date = '', $content_callback = '', $echo = TRUE, $id 
   else {
     return $html;
   }
-
 }
 
 /**
@@ -2772,7 +2809,7 @@ function evalute_math( $string = '', &$sanitized_string = '' ) {
   $string = preg_replace( '#\(([^0-9(-]+)#', '(', $string );
   $string = preg_replace( '#([^0-9)]+)\)#', ')', $string );
 
-  // Remove () and )(
+  // Remove () and )( .
   $string = strtr( $string, array(')(' => '', '()' => ''));
 
   // Autoclosing missed cloed brackets.
@@ -3325,14 +3362,11 @@ function dec_to_roman($decimal = 0) {
  * @return string
  */
 function num_to_month($num = 0, $long_names = FALSE) {
-
   if ( $long_names ) {
-    $months = array( 'January', 'February', 'March', 'April', 'May', 'June', 'July',
-                      'August', 'September', 'October', 'November', 'December' );
+    $months = array( 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December' );
   }
   else {
-    $months = array( 'Jan.', 'Feb.', 'Mar.', 'Apr.', 'May', 'Jun.', 'Jul.',
-                      'Aug.', 'Sep.', 'Oct.', 'Nov.', 'Dec.' );
+    $months = array( 'Jan.', 'Feb.', 'Mar.', 'Apr.', 'May', 'Jun.', 'Jul.', 'Aug.', 'Sep.', 'Oct.', 'Nov.', 'Dec.' );
   }
   return isset( $months[$num+1] ) ? $months[$num+1] : NULL;
 }
@@ -3352,7 +3386,7 @@ function num_to_weekday($num = 0, $long_names = FALSE) {
   else {
     $days = array( 'Sun.', 'Mon.', 'Tue.', 'Wed.', 'Thu.', 'Fri.', 'Sat.' );
   }
-  return isset( $days[$num+1] ) ? $days[$num+1] : NULL;
+  return isset( $days[$num] ) ? $days[$num] : NULL;
 }
 
 /**
@@ -3470,7 +3504,7 @@ function transliterate($string = '', $from_latin = FALSE) {
   }
 
   $ctable = array(
-    // cyr
+    // Cyrilic.
     'А' => 'A', 'Б' => 'B', 'В' => 'V', 'Г' => 'G', 'Д' => 'D', 'Е' => 'E', 'Ё' => 'E', 'Ж' => 'ZH', 'З' => 'Z', 'Й' => 'I',
     'К' => 'K', 'Л' => 'L', 'М' => 'M', 'Н' => 'N', 'О' => 'O', 'П' => 'P', 'Р' => 'R', 'С' => 'S', 'Т' => 'T', 'У' => 'U',
     'Ф' => 'F', 'Х' => 'KH', 'Ц' => 'TS', 'Ч' => 'CH', 'Ш' => 'SH', 'Щ' => 'SHT', 'Ы' => 'Y', 'Э' => 'E', 'Ю' => 'YU',
@@ -3478,11 +3512,11 @@ function transliterate($string = '', $from_latin = FALSE) {
     'и' => 'i', 'й' => 'i', 'к' => 'k', 'л' => 'l', 'м' => 'm', 'н' => 'n', 'о' => 'o', 'п' => 'p', 'р' => 'r', 'с' => 's',
     'т' => 't', 'у' => 'u', 'ф' => 'f', 'х' => 'kh', 'ц' => 'ts', 'ч' => 'ch', 'ш' => 'sh', 'щ' => 'sht', 'ы' => 'y',
     'э' => 'e', 'ю' => 'yu', 'я' => 'ya', 'Ъ' => 'A', 'ъ' => 'a', 'Ь' => 'Y', 'ь' => 'y',
-    // greek
+    // Greek.
     'Σ' => 'S', 'σ' => 's', 'ς' => 's', 'Ψ' => 'PS', 'Ω' => 'O', 'Ξ' => 'X', 'Θ' => 'TH', 'Δ' => 'D', 'ή' => 'NG', 'ΤΘ' => 'TTH',
     'ΤΖ' => 'TJ', 'γ' => 'g', 'ζ' => 'z', 'ξ' => 'x', 'φ' => 'F', 'Φ' => 'f', 'ω' => 'o', 'ι' => 'i', 'δ' => 'd', 'β' => 'b',
     'α' => 'a', 'π' => 'pe', 'ϻ' => 'sin', 'ϝ' => 'waw',
-    // simple mandarin
+    // Simple mandarin.
     'ㄔ' => 'c', 'ㄚ' => 'a', 'ㄞ' => 'ai', 'ㄢ' => 'an', 'ㄤ' => 'ar', 'ㄅ' => 'b', 'ㄅ' => 'be', 'ㄠ' => 'sw', 'ㄓ' => 'jw'
   );
 
