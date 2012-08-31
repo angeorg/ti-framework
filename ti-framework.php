@@ -443,25 +443,19 @@ endif;
  * @return bool
  */
 function load_include($include = '') {
-
+  $include = trim( $include, '/' );
   $possible_files = array(
-      TI_PATH_APP . '/' . TI_FOLDER_INC . '/class-' . $include . TI_EXT_INC,
-      TI_PATH_APP . '/' . TI_FOLDER_INC . '/class.' . $include . TI_EXT_INC,
       TI_PATH_APP . '/' . TI_FOLDER_INC . '/' . $include . TI_EXT_INC,
+      TI_PATH_APP . '/' . TI_FOLDER_INC . '/' . dirname( $include ). '/class-' . basename( $include ) . TI_EXT_INC,
   );
-
   $possible_files = do_hook( 'load_include', $possible_files, $include );
-
   foreach ( $possible_files as $file ) {
     if ( is_readable( $file ) ) {
       include_once( $file );
       return TRUE;
     }
-    else {
-      show_error( 'System error', 'Include <strong>' . $include . '</strong> not exists.' );
-    }
   }
-
+  show_error( 'System error', 'Include <strong>' . $include . '</strong> not exists.' );
 }
 
 /**
@@ -483,10 +477,8 @@ function is_mobile() {
   static $is_mobile = NULL;
 
   if ( $is_mobile === NULL ) {
-
     $user_agent = $_SERVER['HTTP_USER_AGENT'];
     $accept = $_SERVER['HTTP_ACCEPT'];
-
     if ( stripos( $user_agent, 'tablet' ) !== FALSE ) {
       $is_mobile = FALSE;
     }
@@ -500,7 +492,6 @@ function is_mobile() {
       $is_mobile = TRUE;
     }
   }
-
   return CAST_TO_BOOL( do_hook( 'is_mobile', $is_mobile, $user_agent, $accept ) );
 }
 
@@ -3756,7 +3747,7 @@ class TI_Database extends PDO {
     $prepend_clause = ' ' . $prepend_clause . ' ';
     $separator = ' ' . $separator . ' ';
 
-    $querystr = implode($separator, $q);
+    $querystr = implode( $separator, $q);
 
     if ($querystr) {
       return $prepend_clause . $querystr;
@@ -3778,7 +3769,7 @@ class TI_Database extends PDO {
 
     $elements = CAST_TO_ARRAY( $elements );
 
-    $querystr = 'INSERT INTO ' . $this->db_column($table);
+    $querystr = 'INSERT INTO ' . $this->db_table( $table );
 
     $keys = array();
     foreach ( array_keys( $elements ) as $key ) {
@@ -3815,7 +3806,7 @@ class TI_Database extends PDO {
       $cond_str = $this->build_keypair_clause( $condition, $args, 'WHERE', 'AND' );
     }
 
-    $querystr = 'DELETE FROM ' . $this->db_column( $table ) . $cond_str;
+    $querystr = 'DELETE FROM ' . $this->db_table( $table ) . $cond_str;
 
     $this->query( $querystr, $args );
 
@@ -3850,7 +3841,7 @@ class TI_Database extends PDO {
       }
 
       $querystr = 'UPDATE ' .
-          $this->db_column($table) .
+          $this->db_table( $table ) .
           $set_str .
           $this->build_keypair_clause($condition, $args, 'WHERE', 'AND');
       $this->query($querystr, $args);
@@ -3877,7 +3868,7 @@ class TI_Database extends PDO {
     $args = array();
     $querystr = 'SELECT';
 
-    if (!$columns || $columns == '*') {
+    if (empty($columns) || $columns == '*') {
       $querystr .= ' * ';
     }
     else {
@@ -3888,12 +3879,12 @@ class TI_Database extends PDO {
       $querystr .= ' ' . implode( ', ', $columns );
     }
 
-    $querystr .= ' FROM ' . $table;
+    $querystr .= ' FROM ' . $this->db_table( $table );
 
-    if (is_string($condition)) {
+    if ( is_string($condition) && $condition ) {
       $querystr .= ' WHERE ' . $condition;
     }
-    else {
+    elseif ( $condition && ( is_array( $condition ) || is_object( $condition )) ) {
       $querystr .= $this->build_keypair_clause($condition, $args, 'WHERE', 'AND');
     }
 
@@ -4098,7 +4089,7 @@ class Image {
   function save_to_file($filename, $quality = FALSE, $permissions = NULL) {
     if ( imagejpeg($this->im, $filename, ( $quality ? $quality : $this->quality)) ) {
       if ($permissions !== NULL) {
-        chmod($filename, $permissions);
+        chmod( $filename, $permissions );
       }
       return TRUE;
     }
@@ -4312,9 +4303,7 @@ class Image {
     imagecopyresampled( $image_proccess, $this->im, 0, 0, 0, 0, $new_width, $new_height, $width_orig, $height_orig );
 
     $image_new = imagecreatetruecolor( $width, $height );
-    imagecopyresampled( $image_new, $image_proccess,
-        0, 0, ($x_mid - ($width / 2)), ($y_mid - ($height / 2)),
-        $width, $height, $width, $height);
+    imagecopyresampled( $image_new, $image_proccess, 0, 0, ($x_mid - ($width / 2)), ($y_mid - ($height / 2)), $width, $height, $width, $height);
     imagedestroy( $image_proccess );
 
     $this->im = $image_new;
@@ -4369,7 +4358,6 @@ class Image {
     }
 
     $fontsize = CAST_TO_INT( $fontsize, 1, 120 );
-
     $black = imagecolorallocate( $this->im, 0, 0, 0 );
 
     if ( strpos( $position, 'LEFT' ) !== FALSE ) {
@@ -4378,18 +4366,15 @@ class Image {
     else {
       $mark_x = imagesx( $this->im ) - 10 - strlen( $text ) * $fontsize;
     }
-
     if ( strpos($position, 'TOP') !== FALSE) {
       $mark_y = 10;
     }
     else {
       $mark_y = imagesy( $this->im ) - 10 - $fontsize;
     }
-
     if ( is_readable( $font )) {
       return FALSE;
     }
-
     return (bool) imagettftext( $this->im, $fontsize, 0, $mark_x, $mark_y, $black, $font, $text );
   }
 
