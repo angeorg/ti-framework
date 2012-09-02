@@ -84,10 +84,6 @@ index.php
 // Enable/Disable debugging, or -1 to enable only logging errors
 //define( 'TI_DEBUG_MODE',           FALSE );
 
-// Web url to application (must ending with slash)
-// can be domain relative like /my-app/ or full http://example.com/ or just /
-//define( 'TI_PATH_WEB',             '/' );
-
 // Disable mod_rewrite support.
 //define( 'TI_DISABLE_MOD_REWRITE',  FALSE );
 
