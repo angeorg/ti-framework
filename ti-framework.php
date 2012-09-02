@@ -2,6 +2,7 @@
 
 /**
  * ti-framework.php - The complete framework's code.
+ * v0.9.9.3
  *
  * Copyright (c) 2010-2012, e01 <dimitrov.adrian@gmail.com>
  * All rights reserved.
@@ -59,11 +60,9 @@ function _ti_fix_server_vars() {
   else {
     // Fix server vars, all credits to WordPress team.
     $_SERVER = array_merge( array('SERVER_SOFTWARE' => '', 'REQUEST_URI' => ''), $_SERVER );
-
     // Fix for IIS when running with PHP ISAPI.
     if ( empty( $_SERVER['REQUEST_URI'] ) ||
         ( php_sapi_name() != 'cgi-fcgi' && preg_match( '/^Microsoft-IIS\//', $_SERVER['SERVER_SOFTWARE'] ) ) ) {
-
       // IIS Mod-Rewrite
       if ( isset( $_SERVER['HTTP_X_ORIGINAL_URL'] ) ) {
         $_SERVER['REQUEST_URI'] = $_SERVER['HTTP_X_ORIGINAL_URL'];
@@ -77,7 +76,6 @@ function _ti_fix_server_vars() {
         if ( !isset( $_SERVER['PATH_INFO'] ) && isset( $_SERVER['ORIG_PATH_INFO'] ) ) {
           $_SERVER['PATH_INFO'] = $_SERVER['ORIG_PATH_INFO'];
         }
-
         // Some IIS + PHP configurations puts the script-name in the path-info (No need to append it twice)
         if ( isset( $_SERVER['PATH_INFO'] ) ) {
           if ( $_SERVER['PATH_INFO'] == $_SERVER['SCRIPT_NAME'] ) {
@@ -87,41 +85,34 @@ function _ti_fix_server_vars() {
             $_SERVER['REQUEST_URI'] = $_SERVER['SCRIPT_NAME'] . $_SERVER['PATH_INFO'];
           }
         }
-
         // Append the query string if it exists and isn't null.
         if ( ! empty( $_SERVER['QUERY_STRING'] ) ) {
           $_SERVER['REQUEST_URI'] .= '?' . $_SERVER['QUERY_STRING'];
         }
       }
     }
-
     // Fix for PHP as CGI hosts that set SCRIPT_FILENAME to something ending in php.cgi for all requests
     if ( isset( $_SERVER['SCRIPT_FILENAME'] ) && ( strpos( $_SERVER['SCRIPT_FILENAME'], 'php.cgi' )
         == strlen( $_SERVER['SCRIPT_FILENAME'] ) - 7 ) ) {
       $_SERVER['SCRIPT_FILENAME'] = $_SERVER['PATH_TRANSLATED'];
     }
-
     // Fix for Dreamhost and other PHP as CGI hosts.
     if ( strpos( $_SERVER['SCRIPT_NAME'], 'php.cgi' ) !== FALSE ) {
       unset( $_SERVER['PATH_INFO'] );
     }
-
     // Fix empty PHP_SELF.
     $PHP_SELF = $_SERVER['PHP_SELF'];
     if ( empty( $PHP_SELF ) ) {
       $_SERVER['PHP_SELF'] = $PHP_SELF = preg_replace( '/(\?.*)?$/', '', $_SERVER["REQUEST_URI"] );
     }
   }
-
   // Sanitize $_SERVER['REQUEST_URI']
   $_SERVER['REQUEST_URI'] = string_sanitize( $_SERVER['REQUEST_URI'] );
   $_SERVER['REQUEST_URI'] = strtr( $_SERVER['REQUEST_URI'], array( '../' => '', './' => '' ) );
-
   // Set TI_HOME if we are on root.
   if ( $_SERVER['REQUEST_URI'] == '/' ) {
     $_SERVER['REQUEST_URI'] = TI_HOME;
   }
-
 }
 
 /**
@@ -146,97 +137,6 @@ function _ti_session_start() {
 }
 
 /**
- * Load URL when define new object of Application with parameters.
- *
- * <?php
- *  add_hook( 'url_rewrites', function($rules) {
- *    $rules['create-new'] = 'users/0/create';
- *    $rules['edit-user-(.+)'] = 'users/$1/edit';
- *    return $rules;
- *  });
- * ?>
- *
- * @fire url_rewrites
- *
- * @param string $url
- *   url to the controller
- * @param string $return
- *   determine to return the output or not
- *
- * @return string|bool
- */
-function Application($url = '', $return = FALSE) {
-
-  // Flag for is it main or not main application query.
-  static $is_main = TRUE;
-
-  // If we have to return the rendered result, this is possible only for non-main urls.
-  if ( $return && !$is_main ) {
-    ob_start();
-    Application( $url, FALSE );
-    return ob_get_clean();
-  }
-
-  $url = '/' . trim( $url, '/' );
-
-  // Trim folder install from the url.
-  $url = substr( $url, strlen( pathinfo( $_SERVER['PHP_SELF'], PATHINFO_DIRNAME ) ) );
-
-  // Apply the rules from url_rewrites.
-  foreach ( do_hook( 'url_rewrites', array() ) as $rule => $rurl ) {
-    if ( preg_match( '#^\/' . $rule . '$#i', $url ) ) {
-      $url = preg_replace( '#^\/' . $rule . '$#i', $rurl, $url );
-      break;
-    }
-  }
-
-  // Protect private controllers.
-  if ($is_main && preg_match( '#\/(\_|\.)#', $url ) ) {
-    show_404();
-  }
-
-  // Handle when arguments need to be passed.
-  $url_segments = explode( '/', ltrim( $url, '/' ) );
-  $url_args = array();
-  do {
-    $path = implode( '/', $url_segments );
-    $class = end( $url_segments ) . 'Controller';
-
-    if ( $path && $class ) {
-      $controller_path = TI_PATH_APP . '/' . TI_FOLDER_CONTROLLER . '/' . $path . TI_EXT_CONTROLLER;
-      if ( is_readable( $controller_path )) {
-        include_once $controller_path;
-        if ( ( $method = array_pop( $url_args ) ) === NULL ) {
-          $method = 'Index';
-        }
-        if ( class_exists( $class, FALSE ) ) {
-          if ( method_exists( $class, $method ) ) {
-            $is_main = FALSE;
-            $app = new $class;
-            return call_user_func_array( array( $app, $method ), array_reverse( $url_args ) );
-          }
-          else {
-            error_log( 'ti-framework: controller\'s method ' . $class . '->' . $method . '() not exists.' );
-            break;
-          }
-        }
-        else {
-          error_log( 'ti-framework: controller class "' . $class .'" not exists.' );
-          break;
-        }
-      }
-    }
-  } while ( $url_args[]  = array_pop( $url_segments ) );
-
-  if ( $is_main ) {
-    show_404();
-  }
-  else {
-    show_error( 'Controller error', 'The controller <strong>' . $url . '</strong> not exists.' );
-  }
-}
-
-/**
  * Message Bus class
  * Store messages per page here.
  * If this function is called with argument text,
@@ -247,7 +147,6 @@ function Application($url = '', $return = FALSE) {
  * @return TI_Messagebus
  */
 function mbus($text = '') {
-
   static $mbus = NULL;
   if ($mbus === NULL) {
     $mbus = new TI_Messagebus;
@@ -299,17 +198,17 @@ function mbus($text = '') {
  */
 function db($db_id = '') {
 
-  if ($db_id) {
+  $db_id = strval( $db_id );
+  if ( $db_id ) {
     $db_id = '_' . $db_id;
   }
 
   static $databases = array();
 
   if ( !defined( 'TI_DB' . $db_id ) ) {
-    show_error( 'System error', 'Database <strong>' . $db_id . '</strong> not configured.' );
+    show_error( 'System error', 'Database <strong> DB' . $db_id . '</strong> not configured.' );
     return NULL;
   }
-
   $hash = md5( $db_id );
 
   if ( isset( $databases[$hash] ) ) {
@@ -322,38 +221,40 @@ function db($db_id = '') {
   }
 
   $dburi = constant( 'TI_DB' . $db_id );
+  $dburi = explode( ',', $dburi, 2 );
+  if ( empty( $dburi[1] ) ) {
+    $dboptions = array();
+  }
+  else {
+     parse_str( strtr( $dburi[1], array( ';' => '&', ',' => '&', '#' => '#' ) ), $dboptions );
+  }
+  $dboptions = array_merge( array( 'username' => NULL, 'password' => NULL, 'prefix' => '' ), $dboptions );
+  $dburi = $dburi[0];
+  $driver = array_get_element( explode( ':', $dburi ), 0 );
 
-  parse_str( str_replace( ';', '&', $dburi ), $cred );
-
-  $username = ifsetor( $cred['username'] );
-  $password = ifsetor( $cred['password'] );
-  $prefix = ifsetor( $cred['prefix'] );
-  unset( $cred['username'], $cred['password'], $cred['prefix'] );
-
-  $dsn = http_build_query( $cred, NULL, ';' );
-  $dsn = urldecode( $dsn );
-
-  foreach ( PDO::getAvailableDrivers() as $driver ) {
-    if ( isset( $cred[$driver . ':dbname'] )) {
-      try {
-        $options = array();
-        if ($driver == 'mysql' && version_compare(PHP_VERSION, '5.3.6', '<=')
-            && isset($cred['charset'])) {
-          $options[PDO::MYSQL_ATTR_INIT_COMMAND] = 'SET NAMES ' . $cred['charset'];
-        }
-        $options = do_hook( 'pdo_options', $options, $cred, $driver );
-        $databases[$hash] = new TI_Database( $dsn, $username, $password, $options );
-        $databases[$hash]->prefix = $prefix;
-        return $databases[$hash];
-      }
-      catch ( PDOException $e ) {
-        show_error( 'System error', 'Can\'t connect to database. <br />' . $e->getMessage() );
-      }
-    }
+  if ( !in_array( $driver, PDO::getAvailableDrivers() ) ) {
+    show_error( 'System error', 'Database driver not found.' );
   }
 
-  show_error( 'System error', 'Database driver not found.' );
-  return NULL;
+  $username = $dboptions['username'];
+  $password = $dboptions['password'];
+  $prefix = $dboptions['prefix'];
+  unset( $dboptions['username'], $dboptions['password'], $dboptions['prefix'] );
+
+  if ( $driver == 'mysql' && isset( $dboptions['charset'] ) && version_compare( PHP_VERSION, '5.3.6', '<=' ) ) {
+    $dboptions[PDO::MYSQL_ATTR_INIT_COMMAND] = 'SET NAMES ' . $dboptions['charset'];
+  }
+  $dboptions = do_hook( 'pdo_options', $dboptions, $driver, $dburi );
+
+  try {
+    $databases[$hash] = new TI_Database( $dburi, $username, $password, $dboptions );
+    $databases[$hash]->prefix = $prefix;
+    return $databases[$hash];
+  }
+  catch ( PDOException $e ) {
+    show_error( 'System error', 'Can\'t connect to database. <br />' . $e->getMessage() );
+    return NULL;
+  }
 }
 
 if ( !function_exists( 'is_cli' )):
@@ -537,30 +438,23 @@ function match_url($pattern = '') {
  *   complete url
  */
 function site_url($url = '', $fullpath = FALSE) {
-
   if ( func_num_args() > 1 ) {
     $url = func_get_args();
   }
-
   if ( is_array($url) ) {
     $url = implode( '/', $url );
   }
-
   $url = preg_replace( '#\/{2,}#', '/', $url );
-
   // Trim slashes.
   $url = trim( $url, '/' );
-
   // If the filename contain dot (.) then seems to be file.
   if ( !pathinfo( $url, PATHINFO_EXTENSION ) ) {
     $url .= '/';
   }
-
   $url = base_url() . ( TI_DISABLE_MOD_REWRITE ? '?' : '' ) . $url;
   if ( $url == '//' ) {
     $url = '/';
   }
-
   return do_hook( 'site_url', $url );
 }
 
@@ -658,11 +552,9 @@ function untrailingslashit($string) {
  * @return void
  */
 function redirect($url = NULL, $time_to_wait = 0) {
-
   if ($url === NULL) {
     $url = $_SERVER['REQUEST_URI'];
   }
-
   $url = site_url($url);
   if ( headers_sent() ) {
     echo
@@ -711,9 +603,7 @@ function redirect_301($url = NULL) {
  *   )
  */
 function po_to_array($file = '') {
-
   $file = CAST_TO_STRING( $file );
-
   if ( is_readable( $file ) ) {
     $is_msgid = FALSE;
     $last_msgid = '';
@@ -782,22 +672,17 @@ function po_to_array($file = '') {
  * @return bool
  */
 function load_locale($locale = '') {
-
   global $_LOCALE;
-
   if ( is_readable( TI_PATH_APP . '/' . TI_FOLDER_LOCALE . '/' . $locale . '.php') ) {
     $_lang = include( TI_PATH_APP . '/' . TI_FOLDER_LOCALE . '/' . $locale . '.php' );
   }
-
   elseif ( is_readable( TI_PATH_APP . '/' . TI_FOLDER_LOCALE . '/' . $locale . '.po') ) {
     $_lang = po_to_array( TI_PATH_APP . '/' . TI_FOLDER_LOCALE . '/' . $locale . '.po' );
   }
-
   else {
-    show_error('System error', 'Locale <strong>' . $locale . '</strong> not exists.');
+    show_error( 'System error', 'Locale <strong>' . $locale . '</strong> not exists.' );
     return FALSE;
   }
-
   $_LOCALE = array_merge( $_LOCALE, CAST_TO_ARRAY( $_lang ) );
   return TRUE;
 }
@@ -887,6 +772,7 @@ function memory_usage() {
  * @return bool
  */
 function set_document_html() {
+  ob_start();
   if ( headers_sent() ) {
     return FALSE;
   }
@@ -919,13 +805,10 @@ function set_document_nocache() {
  * @return bool
  */
 function set_document_downloadable($filename = '', $size = 0) {
-
   if ( headers_sent() ) {
     return FALSE;
   }
-
   $filename = sanitize_string( CAST_TO_STRING( $filename ) );
-
   if ( is_readable( $filename ) ) {
     $size = filesize( $filename );
     $filename = basename( $filename );
@@ -936,7 +819,6 @@ function set_document_downloadable($filename = '', $size = 0) {
     }
     $filename = basename( current_url() );
   }
-
   if ( $size ) {
     header( 'Accept-Ranges: bytes', TRUE );
     header( 'Content-Length: ' . $size, TRUE );
@@ -945,7 +827,6 @@ function set_document_downloadable($filename = '', $size = 0) {
   header( 'Content-Transfer-Encoding: binary', TRUE );
   header( 'Content-Description: File Transfer' );
   header( 'Cache-control: private', TRUE );
-
   return TRUE;
 }
 
@@ -984,38 +865,30 @@ function set_document_downloadable($filename = '', $size = 0) {
  * @return bool
  */
 function document_auth($callback = '', $message = 'Please login') {
-
   if ( headers_sent() ) {
     $callback = create_function( '', 'return FALSE;' );
   }
-
   $success = FALSE;
   if ( is_callable( $callback ) && !empty( $_SERVER['PHP_AUTH_USER'] ) && !empty( $_SERVER['PHP_AUTH_PW'] )) {
-
     // The callback exists, also user data are sent.
     $success = $callback(
         string_sanitize( CAST_TO_STRING( $_SERVER['PHP_AUTH_USER'] ) ),
         string_sanitize( CAST_TO_STRING( $_SERVER['PHP_AUTH_PW'] ) ) );
-
     // Unset the PHP_AUT_USER and PHP_AUTH_PW.
     unset( $_SERVER['PHP_AUTH_USER'], $_SERVER['PHP_AUTH_PW'] );
   }
-
   if ($success) {
     return $success;
   }
-
   if (!$message) {
     $message = $_SERVER['SERVER_NAME'];
   }
   else {
     $message = CAST_TO_STRING( $message );
   }
-
   header( 'WWW-Authenticate: Basic realm="' . htmlspecialchars( $message ) . '"' );
   header( 'HTTP/1.1 401 Unauthorized' );
   header( 'Status: 401 Access Denied' );
-
   return FALSE;
 }
 
@@ -1038,12 +911,10 @@ function document_clean() {
  * @param string $message
  */
 function show_404($message = '') {
-
   if ( !headers_sent() ) {
     header('HTTP/1.1 404 Not Found');
   }
-
-  show_error('404 Page Not Found', '<p>The page you requested &quot;' . current_url() . '&quot; was not found.</p><p>&nbsp;</p><div>' . $message . '</div>', 404);
+  show_error( '404 Page Not Found', '<p>The page you requested &quot;' . current_url() . '&quot; was not found.</p><p>&nbsp;</p><div>' . $message . '</div>', 404 );
 }
 
 /**
@@ -1054,15 +925,15 @@ function show_404($message = '') {
  * @param string $message
  */
 function show_error($title = 'Error', $message = 'An error occurred.', $errno = 000) {
-
+  document_clean();
   if ( is_readable( TI_PATH_APP . '/' . TI_FOLDER_CONTROLLER .'/' . $errno . TI_EXT_CONTROLLER) ) {
     include TI_PATH_APP . '/' . TI_FOLDER_CONTROLLER .'/' . $errno . TI_EXT_CONTROLLER;
     exit;
   }
   else {
     echo
-    '<!doctype html><html><head><title>' . htmlspecialchars( $title ). '</title></head>',
-    '<body><h1>' . $title . '</h1><div>' . $message . '</div></body></html>';
+      '<!doctype html><html><head><title>' . htmlspecialchars( $title ). '</title></head>',
+      '<body><h1>' . $title . '</h1><div>' . $message . '</div></body></html>';
     exit;
   }
 }
@@ -1079,18 +950,16 @@ function show_error($title = 'Error', $message = 'An error occurred.', $errno = 
  * @param int $errline
  */
 function ti_error_handler($errno, $errstr, $errfile, $errline) {
-
   do_hook( 'error_handler', $errno, $errstr, $errfile, $errline );
-
   if ( !TI_DEBUG_MODE ) {
     return TRUE;
   }
   else {
     echo
-    '<div style="border:1px dotted red;" class="ti_error_handler">',
-    '<p><strong>[', $errno, ']</strong> ', $errstr, '</p>',
-    '<p><strong>[', $errline, '] ', $errfile, '</strong></p>',
-    '</div>';
+      '<div style="border:1px dotted red;" class="ti_error_handler">',
+      '<p><strong>[', $errno, ']</strong> ', $errstr, '</p>',
+      '<p><strong>[', $errline, '] ', $errfile, '</strong></p>',
+      '</div>';
   }
 }
 
@@ -1114,34 +983,34 @@ if ( !function_exists('ifsetor') ):
 * This function is backward competability from php 5.6
 *
 * @param mixed &$var
-* @param mixed $fallback
+* @param mixed $default_value
 *
 * @return mixed
 */
-function ifsetor(&$var, $fallback = NULL) {
+function ifsetor(&$var, $default_value = NULL) {
   if ( !isset($var) ) {
-    $var = $fallback;
+    $var = $default_value;
   }
   return $var;
 }
 endif;
 
-if ( !function_exists( 'ifdefor' ) ) {
-  /**
-   * Return constant value, if constant not exists, then create it
-   *
-   * @param string $constant
-   * @param scalar $fallback
-   *
-   * @return scalar
-   */
-  function ifdefor($constant, $fallback = NULL) {
-    if ( !defined ($constant ) ) {
-      define( $constant, $fallback );
-    }
-    return constant( $constant );
+if ( !function_exists( 'ifdefor' ) ):
+/**
+ * Return constant value, if constant not exists, then create it
+ *
+ * @param string $constant
+ * @param scalar $default_value
+ *
+ * @return scalar
+ */
+function ifdefor($constant, $default_value = NULL) {
+  if ( !defined ($constant ) ) {
+    define( $constant, $default_value );
   }
+  return constant( $constant );
 }
+endif;
 
 /**
  * Sanitize string from bad characters
@@ -1189,7 +1058,6 @@ if ( function_exists( 'is_utf8' ) ):
 *   TRUE if the text is valid UTF-8, FALSE if not.
 */
 function is_utf8($text) {
-
   if ( strlen($text) == 0 ) {
     return TRUE;
   }
@@ -1265,7 +1133,6 @@ function CAST_TO_FLOAT($var = 0, $min = NULL, $max = NULL) {
  * @return bool
  */
 function CAST_TO_BOOL($var = FALSE) {
-
   return (bool) filter_var($var, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
 }
 
@@ -1385,19 +1252,14 @@ function CAST_TO_OBJECT($var = NULL) {
  * @return array
  */
 function array_model($array = array(), $model = array(), $strict_mode = TRUE) {
-
   $model = CAST_TO_ARRAY( $model );
-
   if ( !$array ) {
     return $model;
   }
-
   $array = CAST_TO_ARRAY( $array );
-
   if ( !array_is_assoc( $model ) ) {
     $model = array_fill_keys( $model, NULL );
   }
-
   if ( $strict_mode ) {
     $the_array = array();
     foreach ($model as $key => $default_value ) {
@@ -1468,15 +1330,11 @@ function array_group_by($array = array(), $key = 0) {
  * @return array
  */
 function array_get_by_path($path = '/', $array = array()) {
-
   $path = trim( preg_replace( '/\/{2,}/', '/', $path ), '/ ' );
-
   if (!$path) {
     return $array;
   }
-
   $path = explode( '/', $path );
-
   $current_pointer = & $array;
   foreach ( $path as $segment ) {
     if ( isset( $current_pointer[$segment] ) ) {
@@ -1710,7 +1568,6 @@ function is_serialized($data) {
  * @return string
  */
 function filemime($file = '', $fallback_type = 'application-octet/stream') {
-
   $mime = $fallback_type;
   if (function_exists( 'finfo_open' ) ) {
     $finfo = finfo_open( FILEINFO_MIME );
@@ -1750,34 +1607,25 @@ function filemime($file = '', $fallback_type = 'application-octet/stream') {
  * @return bool
  */
 function send_mail($to = '', $subject = '(No subject)', $message = '', $header = '') {
-
   if ( is_string($header) ) {
     $header = explode("\r\n", $header);
   }
   else {
     $header = CAST_TO_ARRAY($header);
   }
-
   $header = array_merge(array(
       'MIME-Version' => '1.0',
       'Content-type' => 'text/html; charset=UTF-8; format=flowed; delsp=yes',
       'Content-Transfer-Encoding' => '8bit',
       'X-Mailer' => 'PHP-' . phpversion(),
   ), $header );
-
   $header = do_hook( 'send_mail_headers', $header );
-
   $header_ = '';
   foreach ($header as $key => $val) {
     $header_ .= $key . ': ' . $val . (PHP_OS == 'Windows' ? "\n.." : "\r\n");
   }
-
   unset( $header );
-
-  $send_mail_fn = 'mail';
-
-  $send_mail_fn = do_hook( 'send_mail_function', $send_mail_fn );
-
+  $send_mail_fn = do_hook( 'send_mail_function', 'mail' );
   return $send_mail_fn( $to, '=?UTF-8?B?' . base64_encode($subject) . '?=', $message, $header_ );
 }
 
@@ -1807,14 +1655,11 @@ function http_query($url, $method = 'GET', $data = NULL, $timeout = 30) {
       'query' => '',
       'fragment' => '',
   );
-
   $query = array_model( $default, parse_url($url) );
-
   $method = strtoupper( $method );
   if (!in_array($method, array('GET', 'POST', 'OPTIONS'))) {
     return FALSE;
   }
-
   $data = CAST_TO_ARRAY( $data );
 
   if ( $method === 'GET' ) {
@@ -1886,7 +1731,6 @@ function http_query($url, $method = 'GET', $data = NULL, $timeout = 30) {
  * @return bool
  */
 function is_writable_real($filename = '') {
-
   if ( file_exists( $filename ) ) {
     return is_writable( $filename );
   }
@@ -1920,10 +1764,8 @@ function make_hash($string = '') {
  * @return string
  */
 function hmacsha1($key = '', $data = '') {
-
   $blocksize = 64;
   $hashfunc = 'sha1';
-
   if ( strlen($key) > $blocksize ) {
     $key = pack( 'H*', $hashfunc($key) );
   }
@@ -1931,7 +1773,6 @@ function hmacsha1($key = '', $data = '') {
   $ipad = str_repeat( chr( 0x36 ), $blocksize );
   $opad = str_repeat( chr( 0x5c ), $blocksize );
   $hmac = pack( 'H*', $hashfunc( ($key^$opad) . pack( 'H*', $hashfunc( ($key^$ipad) . $data ) ) ) );
-
   return $hmac;
 }
 
@@ -1941,13 +1782,10 @@ function hmacsha1($key = '', $data = '') {
  * @return int
  */
 function fileupload_get_size_limit() {
-
   static $fileupload_get_size_limit = 0;
-
   if ( $fileupload_get_size_limit ) {
     return $fileupload_get_size_limit;
   }
-
   $x = array(
     (int) ini_get( 'upload_max_filesize' ),
     (int) ini_get( 'post_max_size' ),
@@ -1998,30 +1836,24 @@ if ( !function_exists('parse_ini_string') ):
 * @return array
 */
 function parse_ini_string($string, $process_sections = FALSE) {
-
   $lines = explode(NL, CAST_TO_STRING($string));
   $return = array();
   $in_sect = FALSE;
-
   foreach ($lines as $line) {
     $line = trim($line);
-
     if (!$line || $line[0] == '#' || $line[0] == ';') {
       continue;
     }
-
     if ($line[0] == '[' && $end_index = strpos($line, ']')) {
       $in_sect = substr($line, 1, $end_index - 1);
       continue;
     }
-
     if (strpos($line, '=')) {
       $keyval = explode('=', $line, 2);
     }
     else {
       $keyval = array('', $line);
     }
-
     if ($process_sections && $in_sect) {
       $return[$in_sect][trim($keyval[0], '"\' ')] = trim($keyval[1], '"\' ');
     }
@@ -2080,7 +1912,6 @@ function session_set($key = '', $value = '') {
     }
     return TRUE;
   }
-
   return ($_SESSION[$key] = $value);
 }
 
@@ -2162,23 +1993,17 @@ function check_nonce($nonce_key = '', $id = '') {
  * @return bool
  */
 function add_hook($hook_name, $function, $priority = 10) {
-
   global $_HOOKS;
-
   if ( !is_array($_HOOKS) ) {
     $_HOOKS = array();
   }
-
   if ( !isset($_HOOKS[$hook_name]) ) {
     $_HOOKS[$hook_name] = array();
   }
-
   if ( !isset($_HOOKS[$hook_name][$priority]) ) {
     $_HOOKS[$hook_name][$priority] = array();
   }
-
   $_HOOKS[$hook_name][$priority][] = $function;
-
   return TRUE;
 }
 
@@ -2215,17 +2040,12 @@ function add_hook($hook_name, $function, $priority = 10) {
  * @return mixed
  */
 function do_hook($hook_name, $value = NULL) {
-
   if ( !has_hook( $hook_name ) ) {
     return $value;
   }
-
   global $_HOOKS;
-
   ksort( $_HOOKS[$hook_name] );
-
   $args = func_get_args();
-
   foreach ( $_HOOKS[$hook_name] as $hook_priority ) {
     foreach ( $hook_priority as $hook ) {
       if ( is_callable( $hook ) ) {
@@ -2234,7 +2054,6 @@ function do_hook($hook_name, $value = NULL) {
       }
     }
   }
-
   return $value;
 }
 
@@ -2246,11 +2065,9 @@ function do_hook($hook_name, $value = NULL) {
  * @return bool
  */
 function delete_hook($hook_name) {
-
   if (!has_hook($hook_name)) {
     return FALSE;
   }
-
   global $_HOOKS;
   $_HOOKS[$hook_name] = array();
   return TRUE;
@@ -2317,7 +2134,6 @@ function cache_exists($key = '', $expire = '3600') {
       return $file;
     }
   }
-
   return FALSE;
 }
 
@@ -2397,23 +2213,17 @@ function checked($current = '', $default = 1, $return = TRUE) {
  * @return string
  */
 function form_options($array = array(), $default_value = NULL, $return = TRUE) {
-
   $array = CAST_TO_ARRAY( $array );
-
   if (!array_is_assoc($array)) {
     $array = array_combine( array_values($array), array_values($array) );
   }
-
   $options = '';
-
   foreach ( $array as $key => $val ) {
     $options .= '<option value="' . esc_attr($key) . '"' . selected( $key, $default_value ). '>' . esc_attr($val) . '</option>';
   }
-
   if ($return) {
     return $options;
   }
-
   echo $options;
 }
 
@@ -2426,16 +2236,13 @@ function form_options($array = array(), $default_value = NULL, $return = TRUE) {
  * @return string
  */
 function make_clickable($text = '', $anchor_length = 40, $attributes = array('target' => '_blank')) {
-
   $text = CAST_TO_STRING( $text );
   $anchor_length = CAST_TO_INT( $anchor_length );
-
   $attributes = CAST_TO_ARRAY( $attributes );
   $custom_attributes = '';
   foreach ($attributes as $key => $val) {
     $custom_attributes .= ' ' . $key . '="' . htmlspecialchars($val) . '"';
   }
-
   $text = preg_replace( '@(?<![.*">])\b(?:(?:https?|ftp|file)://|[a-z]\.)[-A-Z0-9+&#/%=~_|$?!:,.]*[A-Z0-9+&#/%=~_|$]@ei', '\'<a href="\0"'.$custom_attributes.'>\'.substr_middle("\\0", ' . $anchor_length . ').\'</a>\'', $text );
   $text = preg_replace( '#\b([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,6})\b#ei', '\'<a href="mailto:\'.urlencode("\\0").\'" '.$custom_attributes.'>\'.substr_middle("\\0", ' . $anchor_length . ').\'</a>\'', $text );
 
@@ -2456,7 +2263,16 @@ function strip_attributes($html = '') {
  *
  * <?php
  *   // Example usage:
- *   echo paginate( $page, $entries->getTotal(), 'articles/page/%s' );
+ *   add_hook( 'paginate', function($conf) {
+ *     $conf->size = 10;
+ *     $conf->html_cell_normal = '<a class="paginate-item" href="%s">%s</a>';
+ *     $conf->html_cell_active = '<a class="paginate-item-current" href="%s">%s</a>';
+ *     $conf->html_cell_first = '<a class="paginate-item-first" href="%s">&#8592;</a>';
+ *     $conf->html_cell_last = '<a class="paginate-item-last" href="%s">&#8594;</a>';
+ *     return $conf;
+ *   });
+ *
+ *   paginate( $page, $entries->getTotal(), 'articles/page/%s' );
  * ?>
  *
  * @fire paginate
@@ -2488,43 +2304,31 @@ function paginate($page_no, $entries, $per_page = 20, $base_url = '', $echo = TR
   $conf->html_cell_active = '<a href="%s" class="current">%s</a>';
   $conf->html_cell_first = '<a href="%s">&#8592;</a>';
   $conf->html_cell_last = '<a href="%s">&#8594;</a>';
-
   $hook_name = 'paginate' . ( $id ? '-' . $id : '' );
-
   $conf->html_wrapper = '<div '. ( $id ? 'id="paginate-' . $id. '" ' : '' ). 'class="paginate">%s</div>';
-
   $conf = do_hook( 'paginate', $conf );
   if ( $id ) {
     $conf = do_hook( $hook_name, $conf );
   }
-
   $entries = is_array( $entries ) ? count( $entries ) : $entries;
-
   $per_page = CAST_TO_INT( $per_page, 1 );
-
   if ( $per_page >= $entries ) {
     return NULL;
   }
-
   $html = '';
-
   $page_num_last = ceil( $entries / $per_page );
-
   if ( $page_no > $page_num_last ) {
     $page_no = $page_num_last;
   }
   elseif ( $page_no < 1 ) {
     $page_no = 1;
   }
-
   $conf->page_num_prev = $page_no > 1 ? $page_no - 1 : 1;
   $conf->page_num_next = $page_no < $page_num_last ? $page_no + 1 : $page_num_last;
 
   if ( $conf->size ) {
     $half_size = floor( $conf->size / 2 );
-
     $even = $conf->size % 2 ? 1 : 0;
-
     $for_loops = $page_no + $half_size + $even;
     $i = $page_no - $half_size + 1;
 
@@ -2532,12 +2336,10 @@ function paginate($page_no, $entries, $per_page = 20, $base_url = '', $echo = TR
       $for_loops = $conf->size;
       $i = 1;
     }
-
     if ( $for_loops > $page_num_last ) {
       $for_loops = $page_num_last;
       $i = $page_num_last - $conf->size + 1;
     }
-
     if ($i < 1) {
       $i = 1;
     }
@@ -2546,7 +2348,6 @@ function paginate($page_no, $entries, $per_page = 20, $base_url = '', $echo = TR
     $for_loops = $page_num_last;
     $i = 1;
   }
-
   if ( $page_no > 1 ) {
     if ( $conf->html_cell_first ) {
       $html .= sprintf( $conf->html_cell_first, site_url( sprintf( $base_url, 1 ) ) );
@@ -2569,15 +2370,12 @@ function paginate($page_no, $entries, $per_page = 20, $base_url = '', $echo = TR
       $html .= sprintf( $conf->html_cell_last, site_url( sprintf( $base_url, $page_num_last ) ) );
     }
   }
-
   if ( !$html ) {
     return '';
   }
-
   if ( strpos( $conf->html_wrapper, '%s' ) !== FALSE ) {
     $html = sprintf( $conf->html_wrapper, $html );
   }
-
   if ( $echo ) {
     echo $html;
   }
@@ -2591,18 +2389,16 @@ function paginate($page_no, $entries, $per_page = 20, $base_url = '', $echo = TR
  *
  * <?php
  *   // Example usage:
- *   echo calendar( '2012-12-12', '', TRUE, '123' );
+ *
+ *   add_hook( 'calendar-123', function($conf) {
+ *     $conf->monday_is_first = TRUE;
+ *     $conf->show_weekdays = TRUE;
+ *     $conf->show_weekdays_long_names = TRUE;
+ *     return $conf;
+ *   });
+ *
+ *   calendar( '2012-12-12', '', TRUE, '123' );
  * ?>
- *
- * Configuration that can be changed via hooks:
- *
- * stdClass Object
- * (
- *   [id] => <string the id>
- *   [monday_is_first] => <boolean>
- *   [show_weekdays] => <boolean>
- *   [show_weekdays_long_names] => <boolean>
- * )
  *
  * @fire calendar
  * @fire calendar-$id
@@ -2626,18 +2422,13 @@ function calendar($current_date = '', $content_callback = '', $echo = TRUE, $id 
   $conf->monday_is_first = FALSE;
   $conf->show_weekdays = TRUE;
   $conf->show_weekdays_long_names = FALSE;
-
   $hook_name = 'calendar' . ( $id ? '-' . $id : '' );
-
   $conf->html_wrapper = '<table '. ( $id ? 'id="calendar-' . $id. '" ' : '' ). 'class="calendar">%s</table>';
-
   $conf = do_hook( 'calendar', $conf );
   if ( $id ) {
     $conf = do_hook( $hook_name, $conf );
   }
-
   list( $y, $m, $d) = sscanf( $current_date, '%d-%d-%d' );
-
   if ( !$y ) {
     $y = gmdate( 'Y' );
   }
@@ -2662,16 +2453,13 @@ function calendar($current_date = '', $content_callback = '', $echo = TRUE, $id 
 
   $restofmonth = 0;
   for ( $i=0; $i < ( $maxday + $startday + $restofmonth ); $i++ ) {
-
     if ( $i%7 == 0 ) {
       $html .= '<tr>';
     }
-
     $day = $i - $startday + 1;
     if ( $day < 1 || $day > $maxday ) {
       $html .= '<td>&nbsp;</td>';
     }
-
     else {
       $date = $y . '-' . $m . '-' . $day;
       $html .= '<td class="day day-' . $date . ' weekday-' . $i%7 . '">';
@@ -2716,7 +2504,6 @@ function calendar($current_date = '', $content_callback = '', $echo = TRUE, $id 
   if ( strpos( $conf->html_wrapper, '%s' ) !== FALSE ) {
     $html = sprintf( $conf->html_wrapper, $html );
   }
-
   if ( $echo ) {
     echo $html;
   }
@@ -2736,15 +2523,12 @@ function calendar($current_date = '', $content_callback = '', $echo = TRUE, $id 
  * @return string output
  */
 function evalute_php($string, $local_variables = array(), $return = FALSE, &$result = NULL) {
-
   if ( $return ) {
     ob_start();
   }
   extract( CAST_TO_ARRAY( $local_variables ) );
   unset( $local_variables );
-
   $result = eval( 'error_reporting(' . CAST_TO_INT( DEBUG_MODE ) . ');?>' . $string . '<?php ');
-
   if ($return) {
     return ob_get_clean();
   }
@@ -2985,12 +2769,10 @@ function sec_to_min_hour($secs = 0, $format = '%02d:%02d:%02d') {
  * @return string Human readable time difference.
  */
 function human_time_diff( $from, $to = '' ) {
-
   if ( empty($to) ) {
     $to = time();
   }
   $diff = (int) abs($to - $from);
-
   if ($diff <= 3600) {
     $mins = round($diff / 60);
     if ($mins <= 1) {
@@ -2999,7 +2781,6 @@ function human_time_diff( $from, $to = '' ) {
     /* translators: min=minute */
     $since = sprintf(_n('%s min', '%s mins', $mins), $mins);
   }
-
   elseif (($diff <= 86400) && ($diff > 3600)) {
     $hours = round($diff / 3600);
     if ($hours <= 1) {
@@ -3015,7 +2796,6 @@ function human_time_diff( $from, $to = '' ) {
     }
     $since = sprintf(_n('%s day', '%s days', $days), $days);
   }
-
   return $since;
 }
 
@@ -3038,9 +2818,7 @@ function human_time_diff( $from, $to = '' ) {
  * @return mixed
  */
 function alternator() {
-
   static $i = 0;
-
   if ( func_num_args() == 0 ) {
     $i = 0;
     return '';
@@ -3058,7 +2836,6 @@ function alternator() {
  * @return string
  */
 function randstr($len = 4, $charlist = 'a-zA-Z0-9') {
-
   $charlist = str_replace(
     array('0-9', 'a-z', 'A-Z'),
     array(
@@ -3068,10 +2845,8 @@ function randstr($len = 4, $charlist = 'a-zA-Z0-9') {
     ),
     $charlist
   );
-
   $string = '';
   $charlist_len = strlen($charlist) - 1;
-
   for ($i = 0; $i < $len; $i++) {
     $string .= $charlist{rand(0, $charlist_len)};
   }
@@ -3209,7 +2984,6 @@ function assoc_to_path($array = array()) {
  * @return string
  */
 function text_pretty_format($string = '') {
-
   $string = strtr($string, array(
     '---' => '&#8212;&#8212;',
     '--' => '&#8212;',
@@ -3224,10 +2998,7 @@ function text_pretty_format($string = '') {
   ));
   $string = preg_replace( '#\"([^\"]*)\"#', '&ldquo;$1&rdquo;', $string );
   $string = preg_replace( '#\'([^\']*)\'#', '&lsquo;$1&rsquo;', $string );
-
-  do_hook( 'text_pretty_format', $string );
-
-  return $string;
+  return do_hook( 'text_pretty_format', $string );
 }
 
 /**
@@ -3240,15 +3011,12 @@ function text_pretty_format($string = '') {
  * @return string
  */
 function excerpt($string = '', $limit = 100, $end_char = '&#8230;') {
-
   $string = CAST_TO_STRING($string);
-
   preg_match( '/^\s*+(?:\S++\s*+){1,' . CAST_TO_INT($limit) . '}/', $string, $matches );
   if ( strlen($string) == strlen($matches[0]) ) {
     $end_char = '';
   }
   unset( $string );
-
   return rtrim( $matches[0] ) . $end_char;
 }
 
@@ -3260,16 +3028,13 @@ function excerpt($string = '', $limit = 100, $end_char = '&#8230;') {
  * @param string $separate
  */
 function substr_middle($string = '', $length = 255, $separate = '&#8230;') {
-
   $string = CAST_TO_STRING($string);
   $string_length = strlen($string);
   $length = CAST_TO_INT($length);
   $separate = CAST_TO_STRING($separate);
-
   if ( !$length || ($string_length <= $length + strlen($separate)) ) {
     return $string;
   }
-
   return substr( $string, 0, ceil($length / 2)) . $separate . substr($string, -1 * ceil($length / 2) );
 }
 
@@ -3328,15 +3093,12 @@ function strip_whitespaces($text = '') {
  * @return string
  */
 function dec_to_roman($decimal = 0) {
-
   $decimal = CAST_TO_INT( $decimal );
   $result = '';
-
   $romanians = array(
     'M' => 1000, 'CM' => 900, 'D' => 500, 'CD' => 400, 'C' => 100, 'XC' => 90,
     'L' => 50, 'XL' => 40, 'X' => 10, 'IX' => 9, 'V' => 5, 'IV' => 4, 'I' => 1
   );
-
   foreach ( $romanians as $key => $val ) {
     $result .= str_repeat( $key, $decimal / $val );
     $decimal = $decimal % $val;
@@ -3388,9 +3150,7 @@ function num_to_weekday($num = 0, $long_names = FALSE) {
  * @return string
  */
 function sql_now($timestamp = 0) {
-  return !$timestamp
-   ? date( 'Y-m-d H:i:s' )
-   : date( 'Y-m-d H:i:s', $timestamp );
+  return $timestamp ? date( 'Y-m-d H:i:s', $timestamp ) : date( 'Y-m-d H:i:s' );
 }
 
 /**
@@ -3403,9 +3163,7 @@ function sql_now($timestamp = 0) {
  * @return string
  */
 function sql_type_to_widget( $type = '' ) {
-
   $type = CAST_TO_STRING( $type );
-
   if ( preg_match('/^(tinyint\(1\)|bool|boolean)/i', $type) ) {
     $widget = 'checkbox';
   }
@@ -3436,7 +3194,6 @@ function sql_type_to_widget( $type = '' ) {
   else {
     $widget = 'text';
   }
-
   return do_hook( 'sql_type_to_widget', $widget, $type );
 }
 
@@ -3489,11 +3246,9 @@ function sql_get_enum_values($columntype = '') {
  * @return string
  */
 function transliterate($string = '', $from_latin = FALSE) {
-
   if ( !is_string( $string ) ) {
     return '';
   }
-
   $ctable = array(
     // Cyrilic.
     'А' => 'A', 'Б' => 'B', 'В' => 'V', 'Г' => 'G', 'Д' => 'D', 'Е' => 'E', 'Ё' => 'E', 'Ж' => 'ZH', 'З' => 'Z', 'Й' => 'I',
@@ -3510,9 +3265,7 @@ function transliterate($string = '', $from_latin = FALSE) {
     // Simple mandarin.
     'ㄔ' => 'c', 'ㄚ' => 'a', 'ㄞ' => 'ai', 'ㄢ' => 'an', 'ㄤ' => 'ar', 'ㄅ' => 'b', 'ㄅ' => 'be', 'ㄠ' => 'sw', 'ㄓ' => 'jw'
   );
-
   $ctable = do_hook( 'transliterate', $ctable );
-
   if ( $from_latin ) {
     array_flip( $ctable );
   }
@@ -3531,28 +3284,102 @@ function transliterate($string = '', $from_latin = FALSE) {
  * Define classes Application, Messagebus, Database, Calendar, Image, Pagination
  */
 
+
 /**
- * The controller class, provide a controller for the MVC design pattern.
+ * The framework's page class, provide a controller for the MVC design pattern.
  */
-class TI_Controller {
+class TI_Page {
+
+  // system variable, flag if the query is first or not.
+  static $__is_main = TRUE;
+
+  private $__args = array();
+  private $__vars = array();
+  private $__controller = '';
+
+  /*
+   * Load URL when define new object of Application with parameters.
+   *
+   * <?php
+   *  add_hook( 'url_rewrite', function($rules) {
+   *    $rules['create-new'] = 'users/0/create';
+   *    $rules['edit-user-(.+)'] = 'users/$1/edit';
+   *    return $rules;
+   *  });
+   * ?>
+   *
+   * @fire url_rewrite
+   *
+   * @param string $url
+   *   url to the controller
+   * @param string $return
+   *   determine to return the output or not
+   *
+   * @return string|bool
+   */
+  function __construct($url = '', $return = FALSE) {
+    // If we have to return the rendered result, this is possible only for non-main urls.
+    if ( $return && !self::$__is_main ) {
+      ob_start();
+      $this->__construct( $url, FALSE );
+      return ob_get_clean();
+    }
+
+    // Trim folder install from the url.
+    $url = '/' . trim( $url, '/' );
+    $url = '/' . substr( $url, strlen( pathinfo( $_SERVER['PHP_SELF'], PATHINFO_DIRNAME ) ) );
+
+    // Apply the rules from url_rewrites.
+    foreach ( do_hook( 'url_rewrite', array() ) as $rule => $rurl ) {
+      if ( preg_match( '#^\/' . $rule . '$#i', $url ) ) {
+        $url = '/' . preg_replace( '#^\/' . $rule . '$#i', $rurl, $url );
+        break;
+      }
+    }
+
+    // Protect private controllers.
+    if ( self::$__is_main && preg_match( '#\/(\_|\.)#', $url ) ) {
+      show_404();
+    }
+
+    // Handle when arguments need to be passed.
+    $url_segments = explode( '/', ltrim( $url, '/' ) );
+    $url_args = array();
+    do {
+      $controller = string_sanitize( implode( '/', $url_segments ) );
+      if ( is_readable( TI_PATH_APP . '/' . TI_FOLDER_CONTROLLER . '/' . $controller . TI_EXT_CONTROLLER )) {
+        return $this->load( $controller, array_reverse( $url_args ) );
+      }
+    } while ( ( $url_args[] = array_pop( $url_segments ) ) !== NULL && $url_segments );
+
+    if ( self::$__is_main ) {
+      show_404();
+    }
+    else {
+      show_error( 'Controller error', 'The controller <strong>' . $url . '</strong> not exists.' );
+    }
+  }
 
   /**
-   * Store all variables for current instance.
+   * Class constructor, it calling controller when class is instantinated.
    *
-   * @access private
+   * @param string $controller
+   * @param array $arguments
    *
-   * @var array
+   * @return mixed
    */
-  private $__variables = array();
-
-  /**
-   * Store the controller file path.
-   *
-   * @access private
-   *
-   * @var string
-   */
-  public $__controller_path = '';
+  protected function load() {
+    if ( func_get_arg(0) ) {
+      self::$__is_main = FALSE;
+      $this->__args = func_get_arg(1);
+      $this->__controller = func_get_arg(0);
+      $result = include TI_PATH_APP . '/' . TI_FOLDER_CONTROLLER . '/' . $this->__controller . TI_EXT_CONTROLLER;
+      if ( ifdefor( 'TI_AUTORENDER', FALSE ) ) {
+        $this->render($this->__controller);
+      }
+    }
+    return $result;
+  }
 
   /**
    * Render the controller acording the view.
@@ -3563,16 +3390,15 @@ class TI_Controller {
    *   the view from the TI_FOLDER_VIEW, if it is empty
    *   then framework will check if it is available.
    */
-  protected function render($view = '') {
-    if ( $view ) {
-      $view = TI_PATH_APP . '/' . TI_FOLDER_VIEW  . '/' . string_sanitize( $view ). TI_EXT_VIEW;
-      if ( is_readable( $view ) ) {
-        extract( $this->__variables, EXTR_REFS );
-        return include( $view );
+  public function render() {
+    if ( func_get_arg(0) ) {
+      if ( is_readable( TI_PATH_APP . '/' . TI_FOLDER_VIEW  . '/' . string_sanitize( func_get_arg(0) ) . TI_EXT_VIEW ) ) {
+        extract( $this->__vars, EXTR_REFS );
+        return include TI_PATH_APP . '/' . TI_FOLDER_VIEW  . '/' . string_sanitize( func_get_arg(0) ) . TI_EXT_VIEW;
       }
     }
     show_error( 'View error', 'The view <strong>' . func_get_arg(0) . '</strong> not exists.' );
-    error_log( 'ti-framework: view "' . $view . '" not exists.' );
+    error_log( 'ti-framework: view "' . func_get_arg(0) . '" not exists.' );
   }
 
   /**
@@ -3583,7 +3409,18 @@ class TI_Controller {
    * @return array
    */
   protected function vars() {
-    return $this->__variables;
+    return $this->__vars;
+  }
+
+  /**
+   * Get argument passed to controller.
+   *
+   * @access protected
+   *
+   * @return string|NULL
+   */
+  protected function arg($n) {
+    return isset( $this->__args[$n] ) ? (string) $this->__args[$n] : NULL;
   }
 
   /**
@@ -3597,7 +3434,7 @@ class TI_Controller {
    * @return bool
    */
   public function __set($key, $value = NULL) {
-    return ( $this->__variables[$key] = $value );
+    return ( $this->__vars[$key] = $value );
   }
 
   /**
@@ -3610,15 +3447,14 @@ class TI_Controller {
    * @return mixed
    */
   public function &__get($key) {
-    if ( isset( $this->__variables[$key] ) ) {
-      return $this->__variables[$key];
+    if ( isset( $this->__vars[$key] ) ) {
+      return $this->__vars[$key];
     }
     else {
       $val = NULL;
       return $val;
     }
   }
-
 }
 
 /**
@@ -3661,7 +3497,7 @@ class TI_Database extends PDO {
     if ( $column_name ) {
       switch ( $this->getDriver() ) {
         case 'interbase': $sq = '"'; break;
-        case 'mysql': default: $sq = '`';
+        case 'mysql': case 'pgsql': case 'sqlite': case 'sqlite2': default: $sq = '`';
       }
       return $sq . $column_name . $sq;
     }
@@ -3679,6 +3515,26 @@ class TI_Database extends PDO {
     return $this->getAttribute( PDO::ATTR_DRIVER_NAME );
   }
 
+  public function getColumns($table) {
+    $columns = array();
+    switch ( $this->getDriver() ) {
+      case 'sqlite': case 'sqlite2':
+        $querystr = 'PRAGMA TABLE_INFO( ' . $this->db_table( $table ) . ')';
+        foreach ( $this->query($querystr)->fetchAll() as $column ) {
+          $columns[$column->name] = $column->type;
+        }
+        return $columns;
+      case 'mysql': case 'pgsql':
+        $querystr = 'SELECT column_name, column_type FROM information_schema.columns WHERE table_name = ?';
+        $query = $this->query( $querystr, array( $this->prefix . $table ));
+        foreach ( $query->fetchAll() as $column ) {
+          $columns[$column->column_name] = $column->column_type;
+        }
+        return $columns;
+    }
+    return array();
+  }
+
   /**
    * Perform a query to pdo, it is PDO::query() wrapper
    *
@@ -3692,27 +3548,33 @@ class TI_Database extends PDO {
    * @return object
    */
   public function query($querystr = '', $args = array()) {
-
     $args = CAST_TO_ARRAY( $args );
-
     $query = parent::prepare( $querystr );
-    $query->setFetchMode( PDO::FETCH_OBJ) ;
-    $query->execute( $args );
-
-    if ( TI_DEBUG_MODE && (int) $query->errorCode() ) {
-      show_error( 'Database error', vsprintf('<p><strong>%s</strong> %s</p><p>%s</p>', $query->errorInfo() ) );
+    if ( $query === FALSE ) {
+      if ( TI_DEBUG_MODE ) {
+        show_error( 'Database error', vsprintf('<p><strong>%s</strong> %s</p><p>%s</p>', $this->errorInfo() ) );
+      }
+      $query = new PDOStatement;
     }
-
+    else {
+      $query->setFetchMode( PDO::FETCH_OBJ );
+      $query->execute( $args );
+      if ( TI_DEBUG_MODE && (int) $query->errorCode() ) {
+        show_error( 'Database error', vsprintf('<p><strong>%s</strong> %s</p><p>%s</p>', $this->errorInfo() ) );
+      }
+    }
     return $query;
   }
 
   /**
-   * Build keypair_clause from array, object or url string.
+   * Build key-pair clause from array, object or url string.
    *
    * @access public
    *
    * @param mixed $elements
-   * @param args to return &$args
+   * @param array &$args
+   *   array by reference, that will be populated
+   *   with arguments, which can be used to prepare query
    * @param string $prepend_clause
    *   WHERE, HAVING or SET
    * @param string $separator
@@ -3720,17 +3582,13 @@ class TI_Database extends PDO {
    *
    * @return string
    */
-  function build_keypair_clause($elements = array(), &$args = array(), $prepend_clause = 'WHERE', $separator = 'AND') {
-
+  function buildKeypairClause($elements = array(), &$args = array(), $prepend_clause = 'WHERE', $separator = 'AND') {
     $elements = CAST_TO_ARRAY( $elements );
-
     $prepend_clause = trim( $prepend_clause );
     $separator = trim( $separator );
-
     if ($prepend_clause == 'SET') {
       $separator = ',';
     }
-
     foreach ($elements as $key => $val) {
       if ($prepend_clause !== 'SET' && is_array($val) ) {
         $q[] = $this->db_column( $key ) . ' IN ( ' . str_repeat( '?', count($val) ) . ')';
@@ -3743,16 +3601,12 @@ class TI_Database extends PDO {
         $args[] = $val;
       }
     }
-
     $prepend_clause = ' ' . $prepend_clause . ' ';
     $separator = ' ' . $separator . ' ';
-
     $querystr = implode( $separator, $q);
-
     if ($querystr) {
       return $prepend_clause . $querystr;
     }
-
   }
 
   /**
@@ -3766,21 +3620,15 @@ class TI_Database extends PDO {
    * @return int
    */
   function insert($table , $elements) {
-
     $elements = CAST_TO_ARRAY( $elements );
-
     $querystr = 'INSERT INTO ' . $this->db_table( $table );
-
     $keys = array();
     foreach ( array_keys( $elements ) as $key ) {
       $keys[] = $this->db_column( $key );
     }
-
     $querystr.= '(' . implode(',', $keys). ')';
     $querystr.= 'VALUES(' . implode( ',', array_fill( 0, count( $elements ), '?' ) ). ')';
-
     $query = $this->prepare( $querystr );
-
     return $query->execute( array_values( $elements ) );
   }
 
@@ -3797,19 +3645,15 @@ class TI_Database extends PDO {
    * @return int
    */
   function delete($table = '', $condition = array()) {
-
     $args = array();
     if ( is_string( $condition ) ) {
       $cond_str = $condition;
     }
     else {
-      $cond_str = $this->build_keypair_clause( $condition, $args, 'WHERE', 'AND' );
+      $cond_str = $this->buildKeypairClause( $condition, $args, 'WHERE', 'AND' );
     }
-
     $querystr = 'DELETE FROM ' . $this->db_table( $table ) . $cond_str;
-
     $this->query( $querystr, $args );
-
     return $this->affected_rows();
   }
 
@@ -3827,23 +3671,17 @@ class TI_Database extends PDO {
    * @return int
    */
   function update($table = '', $elements = array(), $condition = array()) {
-
     $args = array();
-    $set_str = $this->build_keypair_clause($elements, $args, 'SET', ',');
-
+    $set_str = $this->buildKeypairClause($elements, $args, 'SET', ',');
     if ($set_str) {
-
       if (is_string($condition)) {
         $cond_str = $condition;
       }
       else {
-        $cond_str = $this->build_keypair_clause($condition, $args, 'WHERE', 'AND');
+        $cond_str = $this->buildKeypairClause($condition, $args, 'WHERE', 'AND');
       }
-
-      $querystr = 'UPDATE ' .
-          $this->db_table( $table ) .
-          $set_str .
-          $this->build_keypair_clause($condition, $args, 'WHERE', 'AND');
+      $querystr = 'UPDATE ' . $this->db_table( $table ) . $set_str .
+          $this->buildKeypairClause($condition, $args, 'WHERE', 'AND');
       $this->query($querystr, $args);
       return $this->affected_rows();
     }
@@ -3864,10 +3702,8 @@ class TI_Database extends PDO {
    * @return array
    */
   function select($table = '', $columns = array(), $condition = array()) {
-
     $args = array();
     $querystr = 'SELECT';
-
     if (empty($columns) || $columns == '*') {
       $querystr .= ' * ';
     }
@@ -3878,17 +3714,20 @@ class TI_Database extends PDO {
       }
       $querystr .= ' ' . implode( ', ', $columns );
     }
-
     $querystr .= ' FROM ' . $this->db_table( $table );
-
     if ( is_string($condition) && $condition ) {
       $querystr .= ' WHERE ' . $condition;
     }
     elseif ( $condition && ( is_array( $condition ) || is_object( $condition )) ) {
-      $querystr .= $this->build_keypair_clause($condition, $args, 'WHERE', 'AND');
+      $querystr .= $this->buildKeypairClause($condition, $args, 'WHERE', 'AND');
     }
-
-    return $this->query( $querystr, $args )->fetchAll( PDO::FETCH_OBJ );
+    $results = $this->query( $querystr, $args )->fetchAll( PDO::FETCH_OBJ );
+    if ( $results ) {
+      return $results;
+    }
+    else {
+      return array();
+    }
   }
 
 }
@@ -3968,7 +3807,6 @@ class TI_Messagebus {
   public function clear() {
     session_set( '_ti_mbus', array() );
   }
-
 }
 
 if ( !class_exists( 'Image') ):
@@ -4009,53 +3847,44 @@ class Image {
    * @return boolean
    */
   function load_from_file($filename = '') {
-
     if ( !$filename || !is_readable($filename) ) {
       return FALSE;
     }
-
     if ( !($image_info = getimagesize( $filename )) ) {
       return FALSE;
     }
-
     switch ($image_info['mime']) {
       case 'image/gif':
         if ( function_exists( 'imagecreatefromgif' ) && ( $this->im = imagecreatefromgif( $filename ) ) ) {
           return TRUE;
         }
         break;
-
       case 'image/jpeg':
         if ( function_exists( 'imagecreatefromjpeg' ) && ( $this->im = imagecreatefromjpeg( $filename ) ) ) {
           return TRUE;
         }
         break;
-
       case 'image/png':
         if ( function_exists( 'imagecreatefrompng' ) && ( $this->im = imagecreatefrompng( $filename ) ) ) {
           return TRUE;
         }
         break;
-
       case 'image/wbmp':
         if ( function_exists( 'imagecreatefromwbmp' ) && ( $this->im = imagecreatefromwbmp( $filename ) ) ) {
           return TRUE;
         }
         break;
-
       case 'image/xbm':
         if ( function_exists( 'imagecreatefromxbm' ) && ( $this->im = imagecreatefromxbm( $filename ) ) ) {
           return TRUE;
         }
         break;
-
       case 'image/xpm':
         if ( function_exists( 'imagecreatefromxpm' ) && ( $this->im = imagecreatefromxpm( $filename ) ) ) {
           return TRUE;
         }
         break;
     }
-
     $this->im = NULL;
     return FALSE;
   }
@@ -4220,10 +4049,8 @@ class Image {
    * @return bool
    */
   function resize_to($size, $preserve_smaller = TRUE) {
-
     $width_orig = imagesx( $this->im );
     $height_orig = imagesy( $this->im );
-
     if ( $width_orig > $height_orig ) {
       $ratio = $size / $width_orig;
       $height = $height_orig * $ratio;
@@ -4234,7 +4061,6 @@ class Image {
       $width = $width_orig * $ratio;
       $height = $size;
     }
-
     return $this->resize( $width, $height, $preserve_smaller );
   }
 
@@ -4248,7 +4074,6 @@ class Image {
    * @return bool
    */
   function resize($width, $height, $preserve_smaller = TRUE) {
-
     if ( $preserve_smaller ) {
       $width_orig = imagesx( $this->im );
       $height_orig = imagesy( $this->im );
@@ -4256,7 +4081,6 @@ class Image {
         return TRUE;
       }
     }
-
     $image_new = imagecreatetruecolor( $width, $height );
     $state = imagecopyresampled( $image_new, $this->im, 0, 0, 0, 0, $width, $height, imagesx( $this->im ), imagesy( $this->im ) );
     if ( $state) {
@@ -4275,11 +4099,9 @@ class Image {
    * @return bool
    */
   function resize_cropped($width, $height, $preserve_smaller = TRUE) {
-
     $width_orig = imagesx( $this->im );
     $height_orig = imagesy( $this->im );
     $ratio_orig = $width_orig / $height_orig;
-
     if ( $preserve_smaller ) {
       $width_orig = imagesx( $this->im );
       $height_orig = imagesy( $this->im );
@@ -4287,7 +4109,6 @@ class Image {
         return TRUE;
       }
     }
-
     if ( $width / $height > $ratio_orig ) {
       $new_height = $width / $ratio_orig;
       $new_width = $width;
@@ -4298,14 +4119,11 @@ class Image {
     }
     $x_mid = $new_width / 2;
     $y_mid = $new_height / 2;
-
     $image_proccess = imagecreatetruecolor( round( $new_width ), round( $new_height ) );
     imagecopyresampled( $image_proccess, $this->im, 0, 0, 0, 0, $new_width, $new_height, $width_orig, $height_orig );
-
     $image_new = imagecreatetruecolor( $width, $height );
     imagecopyresampled( $image_new, $image_proccess, 0, 0, ($x_mid - ($width / 2)), ($y_mid - ($height / 2)), $width, $height, $width, $height);
     imagedestroy( $image_proccess );
-
     $this->im = $image_new;
     imagedestroy( $image_new );
     return TRUE;
@@ -4320,7 +4138,6 @@ class Image {
    * @return bool
    */
   function scale($scale = '100', $preserve_smaller = TRUE) {
-
     $width = imagesx( $this->im ) * $scale / 100;
     $height = imagesy( $this->im ) * $scale / 100;
     return $this->resize( $width, $height, $preserve_smaller );
@@ -4350,13 +4167,10 @@ class Image {
    * @return bool
    */
   function wattermark_text($text = '', $fontsize = 18, $font = '', $position = 'RIGHT BOTTOM') {
-
     $text = trim( CAST_TO_STRING( $text ));
-
     if ( !$text ) {
       return FALSE;
     }
-
     $fontsize = CAST_TO_INT( $fontsize, 1, 120 );
     $black = imagecolorallocate( $this->im, 0, 0, 0 );
 
@@ -4390,39 +4204,31 @@ class Image {
    * @return bool
    */
   function wattermark_image($imagefile, $size = 0, $position = 'RIGHT BOTTOM') {
-
     if ( !$imagefile ) {
       return FALSE;
     }
-
     $wim = new Image;
     if (!$wim->load_from_file( $imagefile )) {
       return FALSE;
     }
-
     if ($size) {
       $wim->resize_to( CAST_TO_INT( $size, 8, 640 ), TRUE );
     }
-
     $mark_w = $wim->width();
     $mark_h = $wim->height();
-
     if (strpos($position, 'LEFT') !== FALSE) {
       $mark_x = 10;
     }
     else {
       $mark_x = $this->width() - 10 - $mark_w;
     }
-
     if (strpos($position, 'TOP') !== FALSE) {
       $mark_y = 10;
     }
     else {
       $mark_y = $this->height() - 10 - $mark_h;
     }
-
     return (bool) imagecopy($this->im, $wim->image(), $mark_x, $mark_y, 0, 0, $mark_w, $mark_h);
-
   }
 
   /**
@@ -4434,11 +4240,9 @@ class Image {
    * @return string
    */
   function to_ascii($html = TRUE) {
-
     $text = '';
     $width = imagesx($this->im);
     $height = imagesy($this->im);
-
     for ($h = 0; $h < $height; $h++) {
       for ($w = 0; $w < $width; $w++) {
         $rgb = imagecolorat($this->im, $w, $h);
@@ -4490,7 +4294,7 @@ endif;
  */
 
 // Set the framework version.
-define( 'TI_FW_VERSION', '0.9.9.2' );
+define( 'TI_FW_VERSION', '0.9.9.3' );
 
 // Start the timer.
 define( 'TI_TIMER_START', microtime( TRUE ) );
@@ -4538,7 +4342,7 @@ defined( 'TI_FOLDER_CONTROLLER' )   or define( 'TI_FOLDER_CONTROLLER', 'www' );
 defined( 'TI_EXT_INC' )             or define( 'TI_EXT_INC', '.php' );
 defined( 'TI_EXT_VIEW' )            or define( 'TI_EXT_VIEW', '.html' );
 defined( 'TI_EXT_CONTROLLER' )      or define( 'TI_EXT_CONTROLLER', '.php' );
-
+defined( 'TI_AUTORENDER' )          or define( 'TI_AUTORENDER', FALSE );
 defined( 'TI_AUTOLOAD_FILE' )       or define( 'TI_AUTOLOAD_FILE', '__application.php' );
 defined( 'TI_FOLDER_CACHE' )        or define( 'TI_FOLDER_CACHE', 'cache' );
 
@@ -4581,7 +4385,7 @@ if ( !defined( 'TI_DISABLE_BOOT' )) {
   ini_set( 'mbstring.func_overload', '7' );
   ini_set( 'allow_url_fopen', '0' );
   ini_set( 'register_globals', '0' );
-  ini_set( 'arg_separator.output', '&amp;' );
+  ini_set( 'arg_separator.output', '&' );
   ini_set( 'url_rewriter.tags', '' );
   ini_set( 'magic_quotes_gpc', '0' );
   ini_set( 'magic_quotes_runtime', '0' );
@@ -4627,8 +4431,9 @@ if ( !defined( 'TI_DISABLE_BOOT' )) {
   // Register shutdown hook.
   // @fire shutdown
   register_shutdown_function( 'do_hook', 'shutdown' );
+
   // Let boot the app.
-  Application( $_SERVER['REQUEST_URI'] );
+  $Application = new TI_Page( $_SERVER['REQUEST_URI'], FALSE );
 }
 
 /**
