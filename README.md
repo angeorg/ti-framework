@@ -44,8 +44,7 @@ Example directory structure of app using ti-framework
 index.php
 ---------
 
-<pre>
-<code>
+```php
 <?php
 
 // ------------------------------------------------------------- //
@@ -90,7 +89,7 @@ index.php
 //define( 'TI_EXT_CONTROLLER',       '.php' );
 
 // Autorender, when this option is enabled, then when controller is loaded,
-// it will automatic call \$this->render(<controller>)
+// it will automatic call &#36;this->render(<controller>)
 //define( 'TI_AUTORENDER',            FALSE );
 
 // Autoload this file (<TI_PATH_APP>/TI_AUTOLOAD_FILE) on bootstrap
@@ -111,8 +110,14 @@ index.php
 // Includation instruction to the TI's framework.php             //
 // ------------------------------------------------------------- //
 include 'ti/ti-framework.php';
-</code>
-</pre>
+
+```
+
+Prerequisites
+=============
+
+* PHP >= 5.2.0
+* PDO (in case of using databases)
 
 
 Copyright
@@ -120,3 +125,10 @@ Copyright
 
 Some functions are copy from WordPress and Drupal,
 so all credentials goes to their teams.
+
+Reporting Issues
+================
+
+I would love to hear your feedback. Report issues using the [Github
+Issue Tracker](https://github.com/dimitrov-adrian/ti-framework/issues) or email
+[dimitrov.adrian@gmail.com](mailto:dimitrov.adrian@gmail.com).
