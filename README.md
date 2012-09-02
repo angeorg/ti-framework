@@ -1,13 +1,17 @@
-# About ti-framework #
+About ti-framework
+==================
 
 Non-objective PHP MVC framework
 
 
-# Usage #
+Usage
+=====
+
 ti-framework needs some config instruction be in your index file
 
 
-## Example directory structure of app using ti-framework ##
+Example directory structure of app using ti-framework
+-----------------------------------------------------
 
 <ul>
   <li>
@@ -37,7 +41,10 @@ ti-framework needs some config instruction be in your index file
   </li>
 </ul>
 
-## index.php ##
+index.php
+---------
+
+<pre>
 <code>
 <?php
 
@@ -84,21 +91,20 @@ ti-framework needs some config instruction be in your index file
 
 // Autorender, when this option is enabled, then when controller is loaded,
 // it will automatic call \$this->render(<controller>)
-//define( 'TI_AUTORENDER',           FALSE );
+//define( 'TI_AUTORENDER',            FALSE );
 
 // Autoload this file (<TI_PATH_APP>/TI_AUTOLOAD_FILE) on bootstrap
 //define( 'TI_AUTOLOAD_FILE', '__application.php' );
 
 // Default directory where ti-framework stores the cache
 //define( 'TI_FOLDER_CACHE',         'cache' );
-//define( 'TI_DOCUMENTATION', 'README.html');
 
 // Setup databases
-//define( 'TI_DB',               'mysql:dbname=test;host=localhost,username=user1;password=passWord;prefix=ti_;charset=UTF8');
-//define( 'TI_DB_priv',          'sqlite:somedbfile.sqlite');
+//define( 'TI_DB',                    'mysql:dbname=test;host=localhost,username=user1;password=passWord;prefix=ti_;charset=UTF8');
+//define( 'TI_DB_priv',               'sqlite:somedbfile.sqlite');
 
 // ti-framework documentation url (http://example.com/<TI_DOCUMENTATION>)
-//define( 'TI_DOCUMENTATION',      'README.html');
+//define( 'TI_DOCUMENTATION',         'README.html');
 
 // ------------------------------------------------------------- //
 // This is all required line that you have to have in this file  //
@@ -106,8 +112,11 @@ ti-framework needs some config instruction be in your index file
 // ------------------------------------------------------------- //
 include 'ti/ti-framework.php';
 </code>
+</pre>
 
 
-# Copyright #
+Copyright
+=========
+
 Some functions are copy from WordPress and Drupal,
 so all credentials goes to their teams.
