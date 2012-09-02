@@ -2,24 +2,35 @@
 
 Non-objective PHP MVC framework
 
+
 # Usage
 ti-framework needs some config instruction be in your index file
 
-Example directory structure of app using ti-framework
 
-* /app
-** www
-** html
-** includes
-* ti
-** ti-framework
-** ti-framework-documentation.php
-** README.md
-** .htaccess
-* index.php
+## Example directory structure of app using ti-framework
 
-# index.php
-<pre>
+<ul>
+  <li>
+    /app
+    <ul>
+      <li> www </li>
+      <li> html </li>
+      <li> includes </li>
+    </ul>
+  </li>
+  <li> ti
+    <ul>
+      <li> ti-framework </li>
+      <li> ti-framework-documentation.php </li>
+      <li> README.md </li>
+      <li> .htaccess </li>
+    </ul>
+  </li>
+  <li> index.php </li>
+</ul>
+
+## index.php
+`
 <?php
 
 // ------------------------------------------------------------- //
@@ -64,7 +75,7 @@ Example directory structure of app using ti-framework
 //define( 'TI_EXT_CONTROLLER',       '.php' );
 
 // Autorender, when this option is enabled, then when controller is loaded,
-// it will automatic call $this->render(<controller>)
+// it will automatic call \$this->render(<controller>)
 //define( 'TI_AUTORENDER',           FALSE );
 
 // Autoload this file (<TI_PATH_APP>/TI_AUTOLOAD_FILE) on bootstrap
@@ -86,7 +97,7 @@ Example directory structure of app using ti-framework
 // Includation instruction to the TI's framework.php             //
 // ------------------------------------------------------------- //
 include 'ti/ti-framework.php';
-</pre>
+`
 
 
 # Copyright
