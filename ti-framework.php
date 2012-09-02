@@ -4359,7 +4359,7 @@ if ( $_SERVER['REQUEST_URI'] === site_url( '/favicon.ico' )) {
 // Show documentation or continue with the app.
 if ( defined('TI_DOCUMENTATION') && is_string( TI_DOCUMENTATION )
     && TI_DOCUMENTATION && $_SERVER['REQUEST_URI'] === site_url( TI_DOCUMENTATION ) ) {
-  include TI_PATH_FRAMEWORK . '/documentation.php';
+  include TI_PATH_FRAMEWORK . '/ti-framework-documentation.php';
   exit;
 }
 
