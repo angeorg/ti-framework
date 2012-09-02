@@ -20,15 +20,36 @@ Example directory structure of app using ti-framework
       <li>
         app
         <ul>
-          <li> www </li>
-          <li> html </li>
-          <li> includes </li>
+          <li>
+            www <em>(controllers)</em>
+            <ul>
+              <li> index.php </li>
+              <li> helloworld.php </li>
+          </li>
+          <li>
+            html <em>(views)</em>
+            <ul>
+              <li> index.html </li>
+              <li> helloworld.html </li>
+              <li> header.html </li>
+              <li> footer.html </li>
+            </ul>
+          <li>
+            includes <em>(models and helpers)</em>
+            <ul>
+              <li> somehelper.php </li>
+              <li> class-someclass.php </li>
+            </ul>
+          </li>
+          <li>
+            __application.php <em>(autoloaded file)</em>
+          </li>
         </ul>
       </li>
       <li>
         ti
         <ul>
-          <li> ti-framework </li>
+          <li> ti-framework.php </li>
           <li> ti-framework-documentation.php </li>
           <li> README.md </li>
           <li> .htaccess </li>
@@ -93,7 +114,7 @@ index.php
 //define( 'TI_AUTORENDER',            FALSE );
 
 // Autoload this file (<TI_PATH_APP>/TI_AUTOLOAD_FILE) on bootstrap
-//define( 'TI_AUTOLOAD_FILE', '__application.php' );
+//define( 'TI_AUTOLOAD_FILE',         '__application.php' );
 
 // Default directory where ti-framework stores the cache
 //define( 'TI_FOLDER_CACHE',         'cache' );
@@ -113,8 +134,8 @@ include 'ti/ti-framework.php';
 
 ```
 
-Prerequisites
-=============
+Requirements
+============
 
 * PHP >= 5.2.0
 * PDO (in case of using databases)
