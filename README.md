@@ -1,36 +1,44 @@
-# About ti-framework
+# About ti-framework #
 
 Non-objective PHP MVC framework
 
 
-# Usage
+# Usage #
 ti-framework needs some config instruction be in your index file
 
 
-## Example directory structure of app using ti-framework
+## Example directory structure of app using ti-framework ##
 
 <ul>
   <li>
-    /app
+    /app-root
     <ul>
-      <li> www </li>
-      <li> html </li>
-      <li> includes </li>
+      <li>
+        app
+        <ul>
+          <li> www </li>
+          <li> html </li>
+          <li> includes </li>
+        </ul>
+      </li>
+      <li>
+        ti
+        <ul>
+          <li> ti-framework </li>
+          <li> ti-framework-documentation.php </li>
+          <li> README.md </li>
+          <li> .htaccess </li>
+        </ul>
+      </li>
+      <li>
+        index.php
+      </li>
     </ul>
   </li>
-  <li> ti
-    <ul>
-      <li> ti-framework </li>
-      <li> ti-framework-documentation.php </li>
-      <li> README.md </li>
-      <li> .htaccess </li>
-    </ul>
-  </li>
-  <li> index.php </li>
 </ul>
 
-## index.php
-`
+## index.php ##
+<code>
 <?php
 
 // ------------------------------------------------------------- //
@@ -97,9 +105,9 @@ ti-framework needs some config instruction be in your index file
 // Includation instruction to the TI's framework.php             //
 // ------------------------------------------------------------- //
 include 'ti/ti-framework.php';
-`
+</code>
 
 
-# Copyright
+# Copyright #
 Some functions are copy from WordPress and Drupal,
 so all credentials goes to their teams.
