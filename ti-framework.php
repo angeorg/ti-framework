@@ -3354,7 +3354,6 @@ class TI_Page {
         return $this->load( $controller . '/index', array() );
       }
     } while ( ( $url_args[] = array_pop( $url_segments ) ) !== NULL && $url_segments );
-    exit;
     if ( self::$__is_main ) {
       show_404();
     }
