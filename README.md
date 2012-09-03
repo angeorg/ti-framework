@@ -21,13 +21,13 @@ Example directory structure of app using ti-framework
         app
         <ul>
           <li>
-            www <em>(controllers)</em>
+            www
             <ul>
               <li> index.php </li>
               <li> helloworld.php </li>
           </li>
           <li>
-            html <em>(views)</em>
+            html
             <ul>
               <li> index.html </li>
               <li> helloworld.html </li>
@@ -35,14 +35,14 @@ Example directory structure of app using ti-framework
               <li> footer.html </li>
             </ul>
           <li>
-            includes <em>(models and helpers)</em>
+            includes
             <ul>
               <li> somehelper.php </li>
               <li> class-someclass.php </li>
             </ul>
           </li>
           <li>
-            __application.php <em>(autoloaded file)</em>
+            __application.php
           </li>
         </ul>
       </li>
@@ -81,7 +81,7 @@ index.php
 // Set default home url.
 //define( 'TI_HOME',                 'index' );
 
-// Enable/Disable debugging, or -1 to enable only logging errors
+// Enable/Disable debugging, boolean or PHP error specific type ( E_ALL, E_NOTICE, ... )
 //define( 'TI_DEBUG_MODE',           FALSE );
 
 // Disable mod_rewrite support.

@@ -31,7 +31,7 @@
  * USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-  $functions_file = file( TI_PATH_FRAMEWORK . '/ti-framework.php' );
+  $functions_file = file( __FILE__ );
   $functions = get_defined_functions();
   $functions = $functions['user'];
 
@@ -51,6 +51,10 @@
         <title> ti-framework v<?php echo TI_FW_VERSION?> </title>
         <style>
             * { margin: 0; padding: 0; -webkit-transition: all 0.3s ease-in-out; transition: all 0.3s ease-in-out; }
+            ::-webkit-scrollbar { padding: 5px; width: 6px; height: 6px; }
+            ::-webkit-scrollbar-track { background-color: rgba(0, 0, 0, 0.1); }
+            ::-webkit-scrollbar-thumb { background-color: rgba(0, 0, 0, 0.5); border-radius: 4px; }
+            ::-webkit-scrollbar-thumb:hover { background-color: rgba(0, 0, 0, 0.7); }
             body { background: #eee; color: #111; font: normal 12px sans-serif; }
             a { color: #3b748c; }
             .ti-framework-icon {
@@ -68,7 +72,6 @@
             .helpblock h3 { font-size: 18px; }
             .v-fire { color: #ce5c00; font-weight: bolder; }
             .v-thanks { color: #810087; font-weight: bolder; }
-            .v-access { color: #999966; font-weight: bolder; }
             .v-see { color: #6d914c; font-weight: bolder; }
             .v-param { color: #2397c9; font-weight: bolder; }
             .v-return { color: #f00; font-weight: bolder; }
@@ -216,7 +219,6 @@ highlight_string($index);unset($index);?>
                                 '@thanks' => '<span class="v-thanks">@thanks</span>',
                                 '@fire' => '<span class="v-fire">@fire</span>',
                                 '@param' => '<span class="v-param">@param</span>',
-                                '@access' => '<span class="v-access">@access</span>',
                                 '@return' => '<span class="v-return">@return</span>',
                                 '@see' => '<span class="v-see">@see</span>',
                             )));

@@ -2778,7 +2778,7 @@ function human_time_diff( $from, $to = '' ) {
     if ($mins <= 1) {
       $mins = 1;
     }
-    /* translators: min=minute */
+    // translators: min=minute
     $since = sprintf(_n('%s min', '%s mins', $mins), $mins);
   }
   elseif (($diff <= 86400) && ($diff > 3600)) {
@@ -3297,7 +3297,7 @@ class TI_Page {
   private $__vars = array();
   private $__controller = '';
 
-  /*
+  /**
    * Load URL when define new object of Application with parameters.
    *
    * <?php
@@ -3350,8 +3350,11 @@ class TI_Page {
       if ( is_readable( TI_PATH_APP . '/' . TI_FOLDER_CONTROLLER . '/' . $controller . TI_EXT_CONTROLLER )) {
         return $this->load( $controller, array_reverse( $url_args ) );
       }
+      elseif ( !isset($url_segments[1]) && is_readable( TI_PATH_APP . '/' . TI_FOLDER_CONTROLLER . '/' . $controller . '/index' . TI_EXT_CONTROLLER )) {
+        return $this->load( $controller . '/index', array() );
+      }
     } while ( ( $url_args[] = array_pop( $url_segments ) ) !== NULL && $url_segments );
-
+    exit;
     if ( self::$__is_main ) {
       show_404();
     }
@@ -3371,11 +3374,11 @@ class TI_Page {
   protected function load() {
     if ( func_get_arg(0) ) {
       self::$__is_main = FALSE;
-      $this->__args = func_get_arg(1);
-      $this->__controller = func_get_arg(0);
+      $this->__args = (array) func_get_arg(1);
+      $this->__controller = (string) func_get_arg(0);
       $result = include TI_PATH_APP . '/' . TI_FOLDER_CONTROLLER . '/' . $this->__controller . TI_EXT_CONTROLLER;
       if ( ifdefor( 'TI_AUTORENDER', FALSE ) ) {
-        $this->render($this->__controller);
+        $this->render( $this->__controller, TRUE );
       }
     }
     return $result;
@@ -3389,6 +3392,8 @@ class TI_Page {
    * @param string $view
    *   the view from the TI_FOLDER_VIEW, if it is empty
    *   then framework will check if it is available.
+   * @param bool $noerror
+   *   when TRUE is given, then if the view not exists, then not show an error.
    */
   public function render() {
     if ( func_get_arg(0) ) {
@@ -3397,8 +3402,12 @@ class TI_Page {
         return include TI_PATH_APP . '/' . TI_FOLDER_VIEW  . '/' . string_sanitize( func_get_arg(0) ) . TI_EXT_VIEW;
       }
     }
+    if ( func_get_arg(1) ) {
+      return TRUE;
+    }
     show_error( 'View error', 'The view <strong>' . func_get_arg(0) . '</strong> not exists.' );
     error_log( 'ti-framework: view "' . func_get_arg(0) . '" not exists.' );
+    return FALSE;
   }
 
   /**
@@ -3738,15 +3747,6 @@ class TI_Database extends PDO {
 class TI_Messagebus {
 
   /**
-   * Allowed HTML tags to be used in message body.
-   *
-   * @var $allowed_html_tags
-   *
-   * @access public
-   */
-  public $allowed_html_tags = '<p><div><em><u><b><strong><i><img><a>';
-
-  /**
    * Add message to the messagebu's queue.
    *
    * @access public
@@ -3764,7 +3764,7 @@ class TI_Messagebus {
 
     $o = new stdClass;
     $o->title = strip_tags( CAST_TO_STRING($title) );
-    $o->text = strip_tags( CAST_TO_STRING( $text ), $this->allowed_html_tags );
+    $o->text = strip_tags( CAST_TO_STRING( $text ) );
     $o->class = htmlentities( CAST_TO_STRING($class) );
     $o->attributes = $attributes;
 
@@ -4368,7 +4368,7 @@ if ( !defined( 'TI_DISABLE_BOOT' )) {
 
   // Set debugging mode.
   if ( TI_DEBUG_MODE ) {
-    error_reporting( E_ALL );
+    error_reporting( TI_DEBUG_MODE === TRUE || TI_DEBUG_MODE === 1 ? E_ALL : TI_DEBUG_MODE  );
     ini_set( 'display_errors', 1 );
     ini_set( 'display_startup_errors', TRUE );
   }
