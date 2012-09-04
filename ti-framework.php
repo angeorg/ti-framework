@@ -3394,18 +3394,23 @@ class TI_Page {
    * @param bool $noerror
    *   when TRUE is given, then if the view not exists, then not show an error.
    */
-  public function render() {
-    if ( func_get_arg(0) ) {
-      if ( is_readable( TI_PATH_APP . '/' . TI_FOLDER_VIEW  . '/' . string_sanitize( func_get_arg(0) ) . TI_EXT_VIEW ) ) {
-        extract( $this->__vars, EXTR_REFS );
-        return include TI_PATH_APP . '/' . TI_FOLDER_VIEW  . '/' . string_sanitize( func_get_arg(0) ) . TI_EXT_VIEW;
-      }
+  public function render($view = '', $noerror = FALSE) {
+
+    $__NOERROR__ = $noerror;
+    unset( $noerror );
+
+    if ( $view ) {
+      $view = do_hook( 'page_render', $view );
+      $__VIEW__ = TI_PATH_APP . '/' . TI_FOLDER_VIEW  . '/' . string_sanitize( $view ) . TI_EXT_VIEW;
+      unset( $view );
+      extract( $this->__vars, EXTR_REFS );
+      return include $__VIEW__;
     }
-    if ( func_get_arg(1) ) {
-      return TRUE;
+    if ( $__NOERROR__ ) {
+      return FALSE;
     }
-    show_error( 'View error', 'The view <strong>' . func_get_arg(0) . '</strong> not exists.' );
-    error_log( 'ti-framework: view "' . func_get_arg(0) . '" not exists.' );
+    show_error( 'View error', 'The view <strong>' . $__VIEW__ . '</strong> not exists.' );
+    error_log( 'ti-framework: view "' . $__VIEW__ . '" not exists.' );
     return FALSE;
   }
 
