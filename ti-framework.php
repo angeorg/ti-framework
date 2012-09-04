@@ -168,7 +168,6 @@ function mbus($text = '') {
  *   // Example calling nondefault (defined with TI_DB_fb)
  *   db('fb')->query(...);
  *
- *   // Modify the driver params when init the PDO
  *   add_hook('pdo_options', function($options, $data, $driver) {
  *
  *     if ($driver == 'mysql') {
@@ -3317,7 +3316,7 @@ class TI_Page {
    *
    * @return string|bool
    */
-  function __construct($url = '', $return = FALSE) {
+  public function __construct($url = '', $return = FALSE) {
     // If we have to return the rendered result, this is possible only for non-main urls.
     if ( $return && !self::$__is_main ) {
       ob_start();
@@ -3528,6 +3527,15 @@ class TI_Database extends PDO {
     return $this->getAttribute( PDO::ATTR_DRIVER_NAME );
   }
 
+  /**
+   * Get table columns.
+   *
+   * @param string $table
+   *
+   * @return array|FALSE
+   *   array ( <columnname> => <type )
+   *   or FALSE on failure
+   */
   public function getColumns($table) {
     $columns = array();
     switch ( $this->getDriver() ) {
@@ -3545,7 +3553,7 @@ class TI_Database extends PDO {
         }
         return $columns;
     }
-    return array();
+    return FALSE;
   }
 
   /**
@@ -3763,22 +3771,21 @@ class TI_Messagebus {
    * @return boolean
    */
   public function add($text = '', $title = '', $class = '', $attributes = array()) {
-
-    $attributes = CAST_TO_OBJECT( $attributes );
-
     $o = new stdClass;
-    $o->title = strip_tags( CAST_TO_STRING($title) );
-    $o->text = strip_tags( CAST_TO_STRING( $text ) );
-    $o->class = htmlentities( CAST_TO_STRING($class) );
-    $o->attributes = $attributes;
+    $o->title = CAST_TO_STRING($title);
+    $o->text = CAST_TO_STRING( $text );
+    $o->class = CAST_TO_STRING( $class );
+    $o->attributes = CAST_TO_OBJECT( $attributes );
 
+    if ( !$o->text ) {
+      return FALSE;
+    }
     $m = session_get( '_ti_mbus' );
     if ( !is_array( $m )) {
       $m = array();
     }
     $m[] = $o;
-    session_set( '_ti_mbus', $m );
-    return TRUE;
+    return session_set( '_ti_mbus', $m );
   }
 
   /**
@@ -3826,7 +3833,14 @@ class Image {
    */
   public $quality = 85;
 
-  private $im = NULL;
+  /**
+   * The currently work image.
+   *
+   * @access protected
+   *
+   * @var resorce
+   */
+  protected $im = NULL;
 
   /**
    * If parameter passed, then the class will try to load the,
@@ -3834,11 +3848,11 @@ class Image {
    *
    * @param string $filename
    *
-   * @return bool|$this
+   * @return Image
    */
-  function __construct($filename = '') {
+  public function __construct($filename = '') {
     if ( $filename ) {
-      return $this->load_from_file( $filename );
+      $this->load_from_file( $filename );
     }
     return $this;
   }
@@ -3850,7 +3864,7 @@ class Image {
    *
    * @return boolean
    */
-  function load_from_file($filename = '') {
+  public function load_from_file($filename = '') {
     if ( !$filename || !is_readable($filename) ) {
       return FALSE;
     }
@@ -3900,7 +3914,7 @@ class Image {
    *
    * @return boolean
    */
-  function load_from_string($content = '') {
+  public function load_from_string($content = '') {
     if ( $content && is_string( $content ) && ($i = imagecreatefromstring( $content ) ) ) {
       $this->im = $i;
       return TRUE;
@@ -3919,7 +3933,7 @@ class Image {
    *
    * @return boolean
    */
-  function save_to_file($filename, $quality = FALSE, $permissions = NULL) {
+  public function save_to_file($filename, $quality = FALSE, $permissions = NULL) {
     if ( imagejpeg($this->im, $filename, ( $quality ? $quality : $this->quality)) ) {
       if ($permissions !== NULL) {
         chmod( $filename, $permissions );
@@ -4000,7 +4014,7 @@ class Image {
    *
    * @return string
    */
-  function get_contents($quality = FALSE, $type = 'jpeg') {
+  public function get_contents($quality = FALSE, $type = 'jpeg') {
     ob_start();
     $this->render( $quality, $type, FALSE );
     return ob_get_clean();
@@ -4011,7 +4025,7 @@ class Image {
    *
    * @return bool
    */
-  function interlance() {
+  public function interlance() {
     return (bool) imageinterlace( $this->im, TRUE );
   }
 
@@ -4023,7 +4037,7 @@ class Image {
    *
    * @return bool
    */
-  function resize_to_height($height, $preserve_smaller = TRUE) {
+  public function resize_to_height($height, $preserve_smaller = TRUE) {
     $ratio = $height / imagesy( $this->im );
     $width = imagesx( $this->im ) * $ratio;
     return $this->resize( $width, $height, $preserve_smaller );
@@ -4037,7 +4051,7 @@ class Image {
    *
    * @return bool
    */
-  function resize_to_width($width, $preserve_smaller = TRUE) {
+  public function resize_to_width($width, $preserve_smaller = TRUE) {
     $ratio = $width / imagesx( $this->im );
     $height = imagesy( $this->im ) * $ratio;
     return $this->resize ($width, $height, $preserve_smaller );
@@ -4052,7 +4066,7 @@ class Image {
    *
    * @return bool
    */
-  function resize_to($size, $preserve_smaller = TRUE) {
+  public function resize_to($size, $preserve_smaller = TRUE) {
     $width_orig = imagesx( $this->im );
     $height_orig = imagesy( $this->im );
     if ( $width_orig > $height_orig ) {
@@ -4077,7 +4091,7 @@ class Image {
    *
    * @return bool
    */
-  function resize($width, $height, $preserve_smaller = TRUE) {
+  public function resize($width, $height, $preserve_smaller = TRUE) {
     if ( $preserve_smaller ) {
       $width_orig = imagesx( $this->im );
       $height_orig = imagesy( $this->im );
@@ -4102,7 +4116,7 @@ class Image {
    *
    * @return bool
    */
-  function resize_cropped($width, $height, $preserve_smaller = TRUE) {
+  public function resize_cropped($width, $height, $preserve_smaller = TRUE) {
     $width_orig = imagesx( $this->im );
     $height_orig = imagesy( $this->im );
     $ratio_orig = $width_orig / $height_orig;
@@ -4141,7 +4155,7 @@ class Image {
    *
    * @return bool
    */
-  function scale($scale = '100', $preserve_smaller = TRUE) {
+  public function scale($scale = '100', $preserve_smaller = TRUE) {
     $width = imagesx( $this->im ) * $scale / 100;
     $height = imagesy( $this->im ) * $scale / 100;
     return $this->resize( $width, $height, $preserve_smaller );
@@ -4154,7 +4168,7 @@ class Image {
    *
    * @return bool
    */
-  function rotate($rotate = 90) {
+  public function rotate($rotate = 90) {
     return (( $this->im = imagerotate($this->im, CAST_TO_INT($rotate),  imageColorAllocateAlpha( $this->im, 0, 0, 0, 127) ) ));
   }
 
@@ -4170,7 +4184,7 @@ class Image {
    *
    * @return bool
    */
-  function wattermark_text($text = '', $fontsize = 18, $font = '', $position = 'RIGHT BOTTOM') {
+  public function wattermark_text($text = '', $fontsize = 18, $font = '', $position = 'RIGHT BOTTOM') {
     $text = trim( CAST_TO_STRING( $text ));
     if ( !$text ) {
       return FALSE;
@@ -4207,7 +4221,7 @@ class Image {
    *
    * @return bool
    */
-  function wattermark_image($imagefile, $size = 0, $position = 'RIGHT BOTTOM') {
+  public function wattermark_image($imagefile, $size = 0, $position = 'RIGHT BOTTOM') {
     if ( !$imagefile ) {
       return FALSE;
     }
@@ -4243,7 +4257,7 @@ class Image {
    *
    * @return string
    */
-  function to_ascii($html = TRUE) {
+  public function to_ascii($html = TRUE) {
     $text = '';
     $width = imagesx($this->im);
     $height = imagesy($this->im);
