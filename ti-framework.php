@@ -107,8 +107,12 @@ function _ti_fix_server_vars() {
     }
   }
   // Sanitize $_SERVER['REQUEST_URI']
-  $_SERVER['REQUEST_URI'] = string_sanitize( $_SERVER['REQUEST_URI'] );
+  $_SERVER['REQUEST_URI'] = string_sanitize( strip_tags( $_SERVER['REQUEST_URI'] ) );
   $_SERVER['REQUEST_URI'] = strtr( $_SERVER['REQUEST_URI'], array( '../' => '', './' => '' ) );
+
+  // Preset ti-framework's REQUSET_URI
+  $_SERVER['REQUEST_URI'] = '/' . trim( substr( $_SERVER['REQUEST_URI'], strlen( pathinfo( $_SERVER['PHP_SELF'], PATHINFO_DIRNAME ) ) -1 ), '/' );
+
   // Set TI_HOME if we are on root.
   if ( $_SERVER['REQUEST_URI'] == '/' ) {
     $_SERVER['REQUEST_URI'] = TI_HOME;
@@ -123,17 +127,19 @@ function _ti_fix_server_vars() {
  * @return void
  */
 function _ti_session_start() {
-  // Instantinate session.
-  if ( !session_id() ) {
-    session_start();
-  }
-  if ( ifsetor( $_SESSION['_ti_client'] ) !== md5( get_ip() . $_SERVER['HTTP_USER_AGENT'] )
-      || ifsetor( $_SESSION['_ti_id'] ) !== md5( TI_APP_SECRET . session_id() ) ) {
+  if ( !headers_sent() ) {
+    // Instantinate session.
+    if ( !session_id() ) {
+      session_start();
+    }
+    if ( ifsetor( $_SESSION['_ti_client'] ) !== md5( get_ip() . $_SERVER['HTTP_USER_AGENT'] )
+        || ifsetor( $_SESSION['_ti_id'] ) !== md5( TI_APP_SECRET . session_id() ) ) {
 
-    $_SESSION['_ti_client'] = md5( get_ip() . $_SERVER['HTTP_USER_AGENT'] );
-    $_SESSION['_ti_id'] = md5( TI_APP_SECRET . session_id() );
+      $_SESSION['_ti_client'] = md5( get_ip() . $_SERVER['HTTP_USER_AGENT'] );
+      $_SESSION['_ti_id'] = md5( TI_APP_SECRET . session_id() );
+    }
+    session_regenerate_id();
   }
-  session_regenerate_id();
 }
 
 /**
@@ -343,10 +349,10 @@ endif;
  * @return bool
  */
 function load_include($include = '') {
-  $include = trim( $include, '/' );
+  $include = trim( strtolower( $include ), '/' );
   $possible_files = array(
-      TI_PATH_APP . '/' . TI_FOLDER_INC . '/' . $include . TI_EXT_INC,
-      TI_PATH_APP . '/' . TI_FOLDER_INC . '/' . dirname( $include ). '/class-' . basename( $include ) . TI_EXT_INC,
+      TI_PATH_APP . '/' . TI_FOLDER_INCLUDES . '/' . $include . TI_EXT_INC,
+      TI_PATH_APP . '/' . TI_FOLDER_INCLUDES . '/' . dirname( $include ). '/class-' . basename( $include ) . TI_EXT_INC,
   );
   $possible_files = do_hook( 'load_include', $possible_files, $include );
   foreach ( $possible_files as $file ) {
@@ -382,13 +388,13 @@ function is_mobile() {
     if ( stripos( $user_agent, 'tablet' ) !== FALSE ) {
       $is_mobile = FALSE;
     }
-    elseif ( preg_match( '#(ipod|android|symbian|blackbarry|gsm|phone|mobile|opera mini)#', $user_agent ) ) {
-      $is_mobile = TRUE;
-    }
     elseif ( strpos( $accept, 'text/vnd.wap.wml' ) > 0 || strpos( $accept, 'application/vnd.wap.xhtml+xml') > 0  ) {
       $is_mobile = TRUE;
     }
     elseif ( isset( $_SERVER['HTTP_X_WAP_PROFILE'] ) || isset( $_SERVER['HTTP_PROFILE'] ) ) {
+      $is_mobile = TRUE;
+    }
+    elseif ( preg_match( '#(ipod|android|symbian|blackbarry|gsm|phone|mobile|opera mini)#', $user_agent ) ) {
       $is_mobile = TRUE;
     }
   }
@@ -1188,7 +1194,7 @@ function CAST_TO_ARRAY( $var = array() ) {
     return $var;
   }
   elseif ( is_object($var) ) {
-    return (array) $var;
+    return get_object_cars( $var );
   }
   elseif ( is_string($var) && strpos($var, '&') !== FALSE ) {
     parse_str( $var, $var );
@@ -1233,12 +1239,11 @@ function CAST_TO_OBJECT($var = NULL) {
     parse_str( $var, $var );
     return (object) $var;
   }
-  elseif ( is_scalar($var)) {
-    return (object) $var;
+  $var = new stdClass;
+  if ( is_scalar($var) ) {
+    $var->value = $var;
   }
-  else {
-    return (object) NULL;
-  }
+  return $var;
 }
 
 /**
@@ -1246,18 +1251,18 @@ function CAST_TO_OBJECT($var = NULL) {
  * if strict mode is enabled it strip elements that are not in the model.
  *
  * @param array $array
- * @param array $model
+ * @param array|object|string $model
  *
  * @return array
  */
-function array_model($array = array(), $model = array(), $strict_mode = TRUE) {
+function array_model($array = array(), $model = array(), $default_value = NULL, $strict_mode = TRUE) {
   $model = CAST_TO_ARRAY( $model );
   if ( !$array ) {
     return $model;
   }
   $array = CAST_TO_ARRAY( $array );
   if ( !array_is_assoc( $model ) ) {
-    $model = array_fill_keys( $model, NULL );
+    $model = array_fill_keys( $model, $default_value );
   }
   if ( $strict_mode ) {
     $the_array = array();
@@ -1885,15 +1890,31 @@ function cookie_set($name, $value = '', $expire = 0, $path = '', $domain = '', $
 }
 
 /**
+ * Delete cookie
+ *
+ * @param string|array $key
+ *
+ * @return bool
+ */
+function cookie_delete($key = '') {
+  if ( is_array( $key ) || is_object( $key ) ) {
+    return array_walk ( $key, 'cookie_delete' );
+  }
+  unset( $_COOKIE[$key] );
+  setcookie( $name, '', time() - 3600 );
+  return TRUE;
+}
+
+/**
  * Get cookie value.
  *
  * @param string $name
- * @param mixed $fallback
+ * @param mixed $default_value
  *
  * @return mixed
  */
-function cookie_get($name, $fallback = NULL) {
-  return isset($_COOKIE[$name]) ? $_COOKIE[$name] : $fallback;
+function cookie_get($name, $default_value = NULL) {
+  return isset($_COOKIE[$name]) ? $_COOKIE[$name] : $default_value;
 }
 
 /**
@@ -1905,9 +1926,9 @@ function cookie_get($name, $fallback = NULL) {
  * @return bool
  */
 function session_set($key = '', $value = '') {
-  if (is_array($key) || is_object($key)) {
+  if ( is_array ($key ) || is_object ($key ) ) {
     foreach ($key as $k => $v) {
-      session_set($k, $v);
+      session_set( $k, $v );
     }
     return TRUE;
   }
@@ -1915,24 +1936,51 @@ function session_set($key = '', $value = '') {
 }
 
 /**
+ * Delete variable from the session buss.
+ *
+ * @param string|array $key
+ *
+ * @return bool
+ */
+function session_delete($key = '') {
+  if ( is_array( $key ) || is_object( $key ) ) {
+    return array_walk ( $key, 'session_delete' );
+  }
+  unset( $_SESSION[$key] );
+  return TRUE;
+}
+
+/**
  * Get value stored in the session.
  *
  * @param string $key
- * @param mixed $fallback
+ * @param mixed $default_value
  *
  * @return mixed
  */
-function session_get($key = '', $fallback = NULL) {
-  if (is_array($key) || is_object($key)) {
+function session_get($key = '', $default_value = NULL) {
+  if ( is_array ($key) || is_object( $key ) ) {
     $result = array();
     foreach ($key as $k) {
-      $result[$k] = session_get($k, $fallback);
+      $result[$k] = session_get( $k, $default_value );
     }
     return $result;
   }
   else {
-    return isset( $_SESSION[$key] ) ? $_SESSION[$key] : $fallback;
+    return isset( $_SESSION[$key] ) ? $_SESSION[$key] : $default_value;
   }
+}
+
+/**
+ * Check nonce.
+ *
+ * @param string $nonce_key
+ * @param string $id
+ *
+ * @return bool
+ */
+function check_nonce($nonce_key = '', $id = '') {
+  return ( strcmp( $nonce_key, session_get( '_ti_nonce-' . make_hash( $id ) ) ) === 0 );
 }
 
 /**
@@ -1951,18 +1999,6 @@ function create_nonce($id = '') {
     session_set( '_ti_nonce-' . $key, $nonce );
     return $nonce;
   }
-}
-
-/**
- * Check nonce.
- *
- * @param string $nonce_key
- * @param string $id
- *
- * @return bool
- */
-function check_nonce($nonce_key = '', $id = '') {
-  return ( strcmp( $nonce_key, session_get( '_ti_nonce-' . make_hash( $id ) ) ) === 0 );
 }
 
 /**
@@ -2713,7 +2749,7 @@ function is_word_set($string = '', $min = 0, $max = NULL) {
  * @return bool
  */
 function is_email($string = '') {
-  $pattern = '^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.(?:[A-Z]{2}|com|org|net|edu|gov|mil|biz|info|mobi|name|aero|asia|jobs|museum)$i';
+  $pattern = '#^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.(?:[A-Z]{2}|com|org|net|edu|gov|mil|biz|info|mobi|name|aero|asia|jobs|museum)$#i';
   $result = preg_match( $pattern, CAST_TO_STRING($string) ) ? TRUE : FALSE;
   return do_hook( 'is_email', $result, $string );
 }
@@ -3283,156 +3319,145 @@ function transliterate($string = '', $from_latin = FALSE) {
  * Define classes Application, Messagebus, Database, Calendar, Image, Pagination
  */
 
+/**
+ * Load URL when define new object of Application with parameters.
+ *
+ * <?php
+ *  add_hook( 'url_rewrites', function($rules) {
+ *    $rules['create-new'] = 'users/0/create';
+ *    $rules['edit-user-(.+)'] = 'users/$1/edit';
+ *    return $rules;
+ *  });
+ * ?>
+ *
+ * @fire url_rewrites
+ *
+ * @param string $url
+ *   url to the controller
+ * @param string $return
+ *   determine to return the output or not
+ *
+ * @return string|bool
+ */
+function load_page($url = '', $return = FALSE) {
+
+  static $is_main = TRUE;
+
+  // If we have to return the rendered result, this is possible only for non-main urls.
+  if ( $return && !$is_main ) {
+    ob_start();
+    load_page( $url, FALSE );
+    return ob_get_clean();
+  }
+  // Trim folder install from the url.
+  $url = trim( $url, '/' );
+
+  // Apply the rules from url_rewrites.
+  foreach ( do_hook( 'url_rewrite', array() ) as $rule => $rurl ) {
+    if ( preg_match( '#' . $rule . '$#i', $url ) ) {
+      $url = preg_replace( '#^' . $rule . '$#i', $rurl, $url );
+      break;
+    }
+  }
+
+  // Protect private controllers.
+  if ($is_main && preg_match( '#\/(\_|\.)#', $url ) ) {
+    show_404();
+  }
+
+  // Handle when arguments need to be passed.
+  $url_segments = explode( '/', $url );
+  $url_args = array();
+  do {
+    $path = implode( '/', $url_segments );
+    $class = ucfirst( end( $url_segments ) ) . 'Controller';
+    if ( $path && $class ) {
+      $controller_path = TI_PATH_APP . '/' . TI_FOLDER_CONTROLLER . '/' . strtolower( $path ) . TI_EXT_CONTROLLER;
+      if ( is_readable( $controller_path )) {
+        $is_main = FALSE;
+        include_once $controller_path;
+        if ( ( $method = array_pop( $url_args ) ) === NULL ) {
+          $method = 'Index';
+        }
+        if ( class_exists( $class ) ) {
+          if ( method_exists( $class, $method ) ) {
+            $app = new $class;
+            return call_user_func_array( array( $app, $method ), array_reverse( $url_args ) );
+          }
+          else {
+            error_log( 'ti-framework: controller\'s method ' . $class . '->' . $method . '() not exists.' );
+            break;
+          }
+        }
+        else {
+          error_log( 'ti-framework: controller ' . $class .' not exists.' );
+          break;
+        }
+      }
+    }
+  } while ( $url_args[]  = array_pop( $url_segments ) );
+
+  if ( $is_main ) {
+    show_404();
+  }
+  else {
+    show_error( 'Controller error', 'The controller <strong>' . $url . '</strong> not exists.' );
+  }
+}
 
 /**
  * The framework's page class, provide a controller for the MVC design pattern.
  */
-class TI_Page {
-
-  // system variable, flag if the query is first or not.
-  static $__is_main = TRUE;
-
-  private $__args = array();
-  private $__vars = array();
-  private $__controller = '';
+class TI_Controller {
 
   /**
-   * Load URL when define new object of Application with parameters.
+   * Store all variables for current instance.
    *
-   * <?php
-   *  add_hook( 'url_rewrite', function($rules) {
-   *    $rules['create-new'] = 'users/0/create';
-   *    $rules['edit-user-(.+)'] = 'users/$1/edit';
-   *    return $rules;
-   *  });
-   * ?>
+   * @access protected
    *
-   * @fire url_rewrite
-   *
-   * @param string $url
-   *   url to the controller
-   * @param string $return
-   *   determine to return the output or not
-   *
-   * @return string|bool
+   * @var array
    */
-  public function __construct($url = '', $return = FALSE) {
-    // If we have to return the rendered result, this is possible only for non-main urls.
-    if ( $return && !self::$__is_main ) {
-      ob_start();
-      $this->__construct( $url, FALSE );
-      return ob_get_clean();
-    }
-
-    // Trim folder install from the url.
-    $url = '/' . trim( $url, '/' );
-    $url = '/' . substr( $url, strlen( pathinfo( $_SERVER['PHP_SELF'], PATHINFO_DIRNAME ) ) );
-
-    // Apply the rules from url_rewrites.
-    foreach ( do_hook( 'url_rewrite', array() ) as $rule => $rurl ) {
-      if ( preg_match( '#^\/' . $rule . '$#i', $url ) ) {
-        $url = '/' . preg_replace( '#^\/' . $rule . '$#i', $rurl, $url );
-        break;
-      }
-    }
-
-    // Protect private controllers.
-    if ( self::$__is_main && preg_match( '#\/(\_|\.)#', $url ) ) {
-      show_404();
-    }
-
-    // Handle when arguments need to be passed.
-    $url_segments = explode( '/', ltrim( $url, '/' ) );
-    $url_args = array();
-    do {
-      $controller = string_sanitize( implode( '/', $url_segments ) );
-      if ( is_readable( TI_PATH_APP . '/' . TI_FOLDER_CONTROLLER . '/' . $controller . TI_EXT_CONTROLLER )) {
-        return $this->load( $controller, array_reverse( $url_args ) );
-      }
-      elseif ( !isset($url_segments[1]) && is_readable( TI_PATH_APP . '/' . TI_FOLDER_CONTROLLER . '/' . $controller . '/index' . TI_EXT_CONTROLLER )) {
-        return $this->load( $controller . '/index', array() );
-      }
-    } while ( ( $url_args[] = array_pop( $url_segments ) ) !== NULL && $url_segments );
-    if ( self::$__is_main ) {
-      show_404();
-    }
-    else {
-      show_error( 'Controller error', 'The controller <strong>' . $url . '</strong> not exists.' );
-    }
-  }
-
-  /**
-   * Class constructor, it calling controller when class is instantinated.
-   *
-   * @param string $controller
-   * @param array $arguments
-   *
-   * @return mixed
-   */
-  protected function load() {
-    if ( func_get_arg(0) ) {
-      self::$__is_main = FALSE;
-      $this->__args = (array) func_get_arg(1);
-      $this->__controller = (string) func_get_arg(0);
-      $result = include TI_PATH_APP . '/' . TI_FOLDER_CONTROLLER . '/' . $this->__controller . TI_EXT_CONTROLLER;
-      if ( ifdefor( 'TI_AUTORENDER', FALSE ) ) {
-        $this->render( $this->__controller, TRUE );
-      }
-    }
-    return $result;
-  }
+  protected $__vars = array();
 
   /**
    * Render the controller acording the view.
    *
-   * @access public
+   * @access protected
    *
    * @param string $view
    *   the view from the TI_FOLDER_VIEW, if it is empty
    *   then framework will check if it is available.
+   * @param bool $return
    * @param bool $noerror
    *   when TRUE is given, then if the view not exists, then not show an error.
    */
-  public function render($view = '', $noerror = FALSE) {
+  protected function render($view = '', $return = FALSE, $noerror = FALSE) {
+
+    if ( $return ) {
+      ob_start();
+      $this->render( $view, FALSE, $noerror );
+      return ob_get_clean();
+    }
 
     $__NOERROR__ = $noerror;
     unset( $noerror );
 
     if ( $view ) {
-      $view = do_hook( 'page_render', $view );
-      $__VIEW__ = TI_PATH_APP . '/' . TI_FOLDER_VIEW  . '/' . string_sanitize( $view ) . TI_EXT_VIEW;
-      unset( $view );
-      extract( $this->__vars, EXTR_REFS );
-      return include $__VIEW__;
+      $view = strtolower( string_sanitize( do_hook( 'page_render', $view ) ) );
+      $__VIEW__ = TI_PATH_APP . '/' . TI_FOLDER_VIEW  . '/' .  $view . TI_EXT_VIEW;
+      $__VIEW__S = $view;
+      unset( $view, $return );
+      if ( is_readable( $__VIEW__ )) {
+        extract( $this->__vars, EXTR_SKIP );
+        return include $__VIEW__;
+      }
     }
     if ( $__NOERROR__ ) {
       return FALSE;
     }
-    show_error( 'View error', 'The view <strong>' . $__VIEW__ . '</strong> not exists.' );
-    error_log( 'ti-framework: view "' . $__VIEW__ . '" not exists.' );
+    show_error( 'View error', 'The view <strong>' . $__VIEW__S . '</strong> not exists.' );
+    error_log( 'ti-framework: view "' . $__VIEW__S . '" not exists.' );
     return FALSE;
-  }
-
-  /**
-   * Get all shared variables.
-   *
-   * @access protected
-   *
-   * @return array
-   */
-  protected function vars() {
-    return $this->__vars;
-  }
-
-  /**
-   * Get argument passed to controller.
-   *
-   * @access protected
-   *
-   * @return string|NULL
-   */
-  protected function arg($n) {
-    return isset( $this->__args[$n] ) ? (string) $this->__args[$n] : NULL;
   }
 
   /**
@@ -3477,7 +3502,18 @@ class TI_Page {
 class TI_Database extends PDO {
 
   /**
+   * Store tables structure cache.
+   *
+   * @access private
+   *
+   * @var array
+   */
+  private $_table_columns_cache = array();
+
+  /**
    * Database table's prefix
+   *
+   * @access public
    *
    * @var string
    */
@@ -3492,8 +3528,8 @@ class TI_Database extends PDO {
    *
    * @return string
    */
-  public function db_table($tablename = '') {
-    return $this->db_column( $this->prefix . $tablename );
+  public function tableName($tablename = '') {
+    return $this->columnName( $this->prefix . $tablename );
   }
 
   /**
@@ -3505,7 +3541,7 @@ class TI_Database extends PDO {
    *
    * @return string
    */
-  public function db_column($column_name = '') {
+  public function columnName($column_name = '') {
     if ( $column_name ) {
       switch ( $this->getDriver() ) {
         case 'interbase': $sq = '"'; break;
@@ -3537,13 +3573,17 @@ class TI_Database extends PDO {
    *   or FALSE on failure
    */
   public function getColumns($table) {
+    if ( isset($this->_table_structures[$table]) ) {
+      return $this->_table_structures[$table];
+    }
     $columns = array();
     switch ( $this->getDriver() ) {
       case 'sqlite': case 'sqlite2':
-        $querystr = 'PRAGMA TABLE_INFO( ' . $this->db_table( $table ) . ')';
+        $querystr = 'PRAGMA TABLE_INFO( ' . $this->tableName( $table ) . ')';
         foreach ( $this->query($querystr)->fetchAll() as $column ) {
           $columns[$column->name] = $column->type;
         }
+        $this->_table_structures[$table] = $columns;
         return $columns;
       case 'mysql': case 'pgsql':
         $querystr = 'SELECT column_name, column_type FROM information_schema.columns WHERE table_name = ?';
@@ -3551,6 +3591,7 @@ class TI_Database extends PDO {
         foreach ( $query->fetchAll() as $column ) {
           $columns[$column->column_name] = $column->column_type;
         }
+        $this->_table_structures[$table] = $columns;
         return $columns;
     }
     return FALSE;
@@ -3571,19 +3612,17 @@ class TI_Database extends PDO {
   public function query($querystr = '', $args = array()) {
     $args = CAST_TO_ARRAY( $args );
     $query = parent::prepare( $querystr );
-    if ( $query === FALSE ) {
-      if ( TI_DEBUG_MODE ) {
-        show_error( 'Database error', vsprintf('<p><strong>%s</strong> %s</p><p>%s</p>', $this->errorInfo() ) );
-      }
-      $query = new PDOStatement;
-    }
-    else {
+    if ( $query !== FALSE ) {
       $query->setFetchMode( PDO::FETCH_OBJ );
       $query->execute( $args );
-      if ( TI_DEBUG_MODE && (int) $query->errorCode() ) {
-        show_error( 'Database error', vsprintf('<p><strong>%s</strong> %s</p><p>%s</p>', $this->errorInfo() ) );
+      if ( $query->errorCode() ) {
+        return $query;
       }
     }
+    if ( TI_DEBUG_MODE ) {
+      show_error( 'Database error', vsprintf('<p><strong>%s</strong> %s</p><p>%s</p>', $this->errorInfo() ) );
+    }
+    $query = new PDOStatement;
     return $query;
   }
 
@@ -3612,13 +3651,13 @@ class TI_Database extends PDO {
     }
     foreach ($elements as $key => $val) {
       if ($prepend_clause !== 'SET' && is_array($val) ) {
-        $q[] = $this->db_column( $key ) . ' IN ( ' . str_repeat( '?', count($val) ) . ')';
+        $q[] = $this->columnName( $key ) . ' IN ( ' . str_repeat( '?', count($val) ) . ')';
         foreach ( $val as $v ) {
           $args[] = $v;
         }
       }
       else {
-        $q[] = $this->db_column( $key ) . ' = ? ';
+        $q[] = $this->columnName( $key ) . ' = ? ';
         $args[] = $val;
       }
     }
@@ -3637,20 +3676,33 @@ class TI_Database extends PDO {
    *
    * @param string $table
    * @param mixed $elements
+   * @param mixed ...
+   * @param mixed $elementsN
    *
    * @return int
    */
   function insert($table , $elements) {
-    $elements = CAST_TO_ARRAY( $elements );
-    $querystr = 'INSERT INTO ' . $this->db_table( $table );
-    $keys = array();
-    foreach ( array_keys( $elements ) as $key ) {
-      $keys[] = $this->db_column( $key );
+
+    $elements_multiple = func_get_args();
+    unset( $elements_multiple[0] );
+
+    $keys =  array_keys( $elements );
+    $vals_str = array();
+    $vals = array();
+    $keys_count = count( $keys );
+
+    foreach ( $elements_multiple as &$elements ) {
+      $elements = array_model( CAST_TO_ARRAY( $elements ), $keys );
+      $vals_str[] = '(' . implode( ',', array_fill( 0, $keys_count, '?' ) ). ')';
+      $vals = array_pad( array_merge( $vals, array_values( $elements ) ), $keys_count, NULL );
     }
-    $querystr.= '(' . implode(',', $keys). ')';
-    $querystr.= 'VALUES(' . implode( ',', array_fill( 0, count( $elements ), '?' ) ). ')';
+
+    $querystr = 'INSERT INTO ' . $this->tableName( $table );
+    $querystr .= ' (' . implode( ',', array_map( array( $this, 'columnName' ), $keys ) ) . ') ';
+    $querystr .= ' VALUES ' . implode( ', ', $vals_str );
     $query = $this->prepare( $querystr );
-    return $query->execute( array_values( $elements ) );
+    $query->execute( $vals );
+    return count($elements_multiple) > 1 ? $this->rowCount() : $this->lastInsertId();
   }
 
   /**
@@ -3673,9 +3725,8 @@ class TI_Database extends PDO {
     else {
       $cond_str = $this->buildKeypairClause( $condition, $args, 'WHERE', 'AND' );
     }
-    $querystr = 'DELETE FROM ' . $this->db_table( $table ) . $cond_str;
-    $this->query( $querystr, $args );
-    return $this->affected_rows();
+    $querystr = 'DELETE FROM ' . $this->tableName( $table ) . $cond_str;
+    return $this->query( $querystr, $args )->rowCount();
   }
 
   /**
@@ -3701,10 +3752,9 @@ class TI_Database extends PDO {
       else {
         $cond_str = $this->buildKeypairClause($condition, $args, 'WHERE', 'AND');
       }
-      $querystr = 'UPDATE ' . $this->db_table( $table ) . $set_str .
+      $querystr = 'UPDATE ' . $this->tableName( $table ) . $set_str .
           $this->buildKeypairClause($condition, $args, 'WHERE', 'AND');
-      $this->query($querystr, $args);
-      return $this->affected_rows();
+      return $this->query($querystr, $args)->rowCount();
     }
     else {
       return 0;
@@ -3731,11 +3781,11 @@ class TI_Database extends PDO {
     else {
       $columns = CAST_TO_ARRAY( $columns );
       foreach ( $columns as &$col ) {
-        $col = $this->db_column( $col );
+        $col = $this->columnName( $col );
       }
       $querystr .= ' ' . implode( ', ', $columns );
     }
-    $querystr .= ' FROM ' . $this->db_table( $table );
+    $querystr .= ' FROM ' . $this->tableName( $table );
     if ( is_string($condition) && $condition ) {
       $querystr .= ' WHERE ' . $condition;
     }
@@ -4325,11 +4375,8 @@ if ( version_compare( PHP_VERSION, '5.2.0', '<' ) ) {
 // Define NL (new line) constant.
 defined( 'NL' ) or define( 'NL', "\n" );
 
-// Set path framework.
-define( 'TI_PATH_FRAMEWORK', pathinfo( __FILE__, PATHINFO_DIRNAME ) );
-
 // Set disabled mod rewrite.
-defined( 'TI_DISABLE_MOD_REWRITE' ) or define( 'TI_DISABLE_MOD_REWRITE',  FALSE );
+defined( 'TI_DISABLE_MOD_REWRITE' ) or define( 'TI_DISABLE_MOD_REWRITE',  !(bool) getenv( 'HTTP_MOD_REWRITE' ) );
 
 // Set default home url.
 defined( 'TI_HOME' ) or define( 'TI_HOME', 'index' );
@@ -4354,7 +4401,7 @@ defined( 'TI_FOLDER_LOCALE' )       or define( 'TI_FOLDER_LOCALE', 'locale' );
 defined( 'TI_TIMEZONE' )            or define( 'TI_TIMEZONE', 'GMT' );
 
 // Set MVC alike folders, if they are not set already by the config file.
-defined( 'TI_FOLDER_INC' )          or define( 'TI_FOLDER_INC', 'includes' );
+defined( 'TI_FOLDER_INCLUDES' )     or define( 'TI_FOLDER_INCLUDES', 'includes' );
 defined( 'TI_FOLDER_VIEW' )         or define( 'TI_FOLDER_VIEW', 'html' );
 defined( 'TI_FOLDER_CONTROLLER' )   or define( 'TI_FOLDER_CONTROLLER', 'www' );
 defined( 'TI_EXT_INC' )             or define( 'TI_EXT_INC', '.php' );
@@ -4368,7 +4415,7 @@ defined( 'TI_FOLDER_CACHE' )        or define( 'TI_FOLDER_CACHE', 'cache' );
 _ti_fix_server_vars();
 
 // Exit if favicon request detected.
-if ( $_SERVER['REQUEST_URI'] === site_url( '/favicon.ico' )) {
+if ( $_SERVER['REQUEST_URI'] === site_url( 'favicon.ico' )) {
   header( 'Expires: ' . gmdate( 'D, d M Y H:i:s', time() + 60 * 60 ) . 'GMT' );
   header( 'Content-Type: image/vnd.microsoft.icon' );
   header( 'Content-Length: 0' );
@@ -4377,7 +4424,7 @@ if ( $_SERVER['REQUEST_URI'] === site_url( '/favicon.ico' )) {
 // Show documentation or continue with the app.
 if ( defined('TI_DOCUMENTATION') && is_string( TI_DOCUMENTATION )
     && TI_DOCUMENTATION && $_SERVER['REQUEST_URI'] === site_url( TI_DOCUMENTATION ) ) {
-  include TI_PATH_FRAMEWORK . '/ti-framework-documentation.php';
+  include dirname( __FILE__ ) . '/ti-framework-documentation.php';
   exit;
 }
 
@@ -4451,7 +4498,8 @@ if ( !defined( 'TI_DISABLE_BOOT' )) {
   register_shutdown_function( 'do_hook', 'shutdown' );
 
   // Let boot the app.
-  $Application = new TI_Page( $_SERVER['REQUEST_URI'], FALSE );
+  load_page( $_SERVER['REQUEST_URI'], FALSE );
+
 }
 
 /**
