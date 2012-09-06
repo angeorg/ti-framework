@@ -7,7 +7,8 @@ Non-objective PHP MVC framework
 Usage
 =====
 
-ti-framework needs some config instruction be in your index file
+ti-framework needs some config instruction be in your index file, and .htaccess file in case
+you need from MOD_REWRITE
 
 
 Example directory structure of app using ti-framework
@@ -61,6 +62,19 @@ Example directory structure of app using ti-framework
     </ul>
   </li>
 </ul>
+
+.htaccess
+---------
+
+//  <IfModule mod_rewrite.c>
+//    RewriteEngine On
+//    SetEnv HTTP_MOD_REWRITE On
+//    RewriteRule ^index\.php$ - [L]
+//    RewriteCond %{REQUEST_FILENAME} !-f
+//    RewriteCond %{REQUEST_FILENAME} !-d
+//    RewriteRule . index.php [L]
+//  </IfModule>
+
 
 index.php
 ---------
