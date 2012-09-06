@@ -132,19 +132,11 @@ function _ti_session_start() {
     if ( !session_id() ) {
       session_start();
     }
-<<<<<<< HEAD
     if ( ifsetor( $_SESSION['_ti_client'] ) !== make_hash( get_ip() . $_SERVER['HTTP_USER_AGENT'] )
         || ifsetor( $_SESSION['_ti_id'] ) !== make_hash( session_id() ) ) {
 
       $_SESSION['_ti_client'] = make_hash( get_ip() . $_SERVER['HTTP_USER_AGENT'] );
       $_SESSION['_ti_id'] = make_hash( session_id() );
-=======
-    if ( ifsetor( $_SESSION['_ti_client'] ) !== md5( get_ip() . $_SERVER['HTTP_USER_AGENT'] )
-        || ifsetor( $_SESSION['_ti_id'] ) !== md5( TI_APP_SECRET . session_id() ) ) {
-
-      $_SESSION['_ti_client'] = md5( get_ip() . $_SERVER['HTTP_USER_AGENT'] );
-      $_SESSION['_ti_id'] = md5( TI_APP_SECRET . session_id() );
->>>>>>> 728f8736163d15b6000d9365802bc8aeac3462d5
     }
     session_regenerate_id();
   }
@@ -359,13 +351,8 @@ endif;
 function load_include($include = '') {
   $include = trim( strtolower( $include ), '/' );
   $possible_files = array(
-<<<<<<< HEAD
       TI_PATH_APP . '/' . TI_FOLDER_INCLUDES . '/' . $include . TI_EXT_INCLUDES,
       TI_PATH_APP . '/' . TI_FOLDER_INCLUDES . '/' . dirname( $include ). '/class-' . basename( $include ) . TI_EXT_INCLUDES,
-=======
-      TI_PATH_APP . '/' . TI_FOLDER_INCLUDES . '/' . $include . TI_EXT_INC,
-      TI_PATH_APP . '/' . TI_FOLDER_INCLUDES . '/' . dirname( $include ). '/class-' . basename( $include ) . TI_EXT_INC,
->>>>>>> 728f8736163d15b6000d9365802bc8aeac3462d5
   );
   $possible_files = do_hook( 'load_include', $possible_files, $include );
   foreach ( $possible_files as $file ) {
@@ -1259,13 +1246,9 @@ function CAST_TO_OBJECT($var = NULL) {
   }
   elseif ( is_string($var) && strpos($var, '&') !== FALSE ) {
     parse_str( $var, $var );
-<<<<<<< HEAD
     if ( $var ) {
       return (object) $var;
     }
-=======
-    return (object) $var;
->>>>>>> 728f8736163d15b6000d9365802bc8aeac3462d5
   }
   $var = new stdClass;
   if ( is_scalar($var) ) {
@@ -1934,22 +1917,6 @@ function cookie_delete($key = '') {
 }
 
 /**
- * Delete cookie
- *
- * @param string|array $key
- *
- * @return bool
- */
-function cookie_delete($key = '') {
-  if ( is_array( $key ) || is_object( $key ) ) {
-    return array_walk ( $key, 'cookie_delete' );
-  }
-  unset( $_COOKIE[$key] );
-  setcookie( $name, '', time() - 3600 );
-  return TRUE;
-}
-
-/**
  * Get cookie value.
  *
  * @param string $name
@@ -1995,21 +1962,6 @@ function session_delete($key = '') {
 }
 
 /**
- * Delete variable from the session buss.
- *
- * @param string|array $key
- *
- * @return bool
- */
-function session_delete($key = '') {
-  if ( is_array( $key ) || is_object( $key ) ) {
-    return array_walk ( $key, 'session_delete' );
-  }
-  unset( $_SESSION[$key] );
-  return TRUE;
-}
-
-/**
  * Get value stored in the session.
  *
  * @param string $key
@@ -2028,18 +1980,6 @@ function session_get($key = '', $default_value = NULL) {
   else {
     return isset( $_SESSION[$key] ) ? $_SESSION[$key] : $default_value;
   }
-}
-
-/**
- * Check nonce.
- *
- * @param string $nonce_key
- * @param string $id
- *
- * @return bool
- */
-function check_nonce($nonce_key = '', $id = '') {
-  return ( strcmp( $nonce_key, session_get( '_ti_nonce-' . make_hash( $id ) ) ) === 0 );
 }
 
 /**
@@ -3390,8 +3330,6 @@ function transliterate($string = '', $from_latin = FALSE) {
  * Define classes Application, Messagebus, Database, Calendar, Image, Pagination
  */
 
-<<<<<<< HEAD
-=======
 /**
  * Load URL when define new object of Application with parameters.
  *
@@ -3412,94 +3350,6 @@ function transliterate($string = '', $from_latin = FALSE) {
  *
  * @return string|bool
  */
-function load_page($url = '', $return = FALSE) {
-
-  static $is_main = TRUE;
-
-  // If we have to return the rendered result, this is possible only for non-main urls.
-  if ( $return && !$is_main ) {
-    ob_start();
-    load_page( $url, FALSE );
-    return ob_get_clean();
-  }
-  // Trim folder install from the url.
-  $url = trim( $url, '/' );
-
-  // Apply the rules from url_rewrites.
-  foreach ( do_hook( 'url_rewrite', array() ) as $rule => $rurl ) {
-    if ( preg_match( '#' . $rule . '$#i', $url ) ) {
-      $url = preg_replace( '#^' . $rule . '$#i', $rurl, $url );
-      break;
-    }
-  }
-
-  // Protect private controllers.
-  if ($is_main && preg_match( '#\/(\_|\.)#', $url ) ) {
-    show_404();
-  }
-
-  // Handle when arguments need to be passed.
-  $url_segments = explode( '/', $url );
-  $url_args = array();
-  do {
-    $path = implode( '/', $url_segments );
-    $class = ucfirst( end( $url_segments ) ) . 'Controller';
-    if ( $path && $class ) {
-      $controller_path = TI_PATH_APP . '/' . TI_FOLDER_CONTROLLER . '/' . strtolower( $path ) . TI_EXT_CONTROLLER;
-      if ( is_readable( $controller_path )) {
-        $is_main = FALSE;
-        include_once $controller_path;
-        if ( ( $method = array_pop( $url_args ) ) === NULL ) {
-          $method = 'Index';
-        }
-        if ( class_exists( $class ) ) {
-          if ( method_exists( $class, $method ) ) {
-            $app = new $class;
-            return call_user_func_array( array( $app, $method ), array_reverse( $url_args ) );
-          }
-          else {
-            error_log( 'ti-framework: controller\'s method ' . $class . '->' . $method . '() not exists.' );
-            break;
-          }
-        }
-        else {
-          error_log( 'ti-framework: controller ' . $class .' not exists.' );
-          break;
-        }
-      }
-    }
-  } while ( $url_args[]  = array_pop( $url_segments ) );
-
-  if ( $is_main ) {
-    show_404();
-  }
-  else {
-    show_error( 'Controller error', 'The controller <strong>' . $url . '</strong> not exists.' );
-  }
-}
-
->>>>>>> 728f8736163d15b6000d9365802bc8aeac3462d5
-/**
- * Load URL when define new object of Application with parameters.
- *
- * <?php
- *  add_hook( 'url_rewrites', function($rules) {
- *    $rules['create-new'] = 'users/0/create';
- *    $rules['edit-user-(.+)'] = 'users/$1/edit';
- *    return $rules;
- *  });
- * ?>
- *
- * @fire url_rewrites
- *
- * @param string $url
- *   url to the controller
- * @param string $return
- *   determine to return the output or not
- *
- * @return string|bool
- */
-<<<<<<< HEAD
 function load_page($url = '', $return = FALSE) {
 
   static $is_main = TRUE;
@@ -3577,16 +3427,6 @@ class TI_Controller {
    * @access protected
    *
    * @var array
-=======
-class TI_Controller {
-
-  /**
-   * Store all variables for current instance.
-   *
-   * @access protected
-   *
-   * @var array
->>>>>>> 728f8736163d15b6000d9365802bc8aeac3462d5
    */
   protected $__vars = array();
 
@@ -3784,7 +3624,6 @@ class TI_Database extends PDO {
     $args = CAST_TO_ARRAY( $args );
     $query = parent::prepare( $querystr );
     if ( $query !== FALSE ) {
-<<<<<<< HEAD
       $query->setFetchMode( PDO::FETCH_OBJ );
       $query->execute( $args );
       if ( $query->errorCode() ) {
@@ -3794,17 +3633,6 @@ class TI_Database extends PDO {
     if ( TI_DEBUG_MODE ) {
       show_error( 'Database error', vsprintf('<p><strong>%s</strong> %s</p><p>%s</p>', $this->errorInfo() ) );
     }
-=======
-      $query->setFetchMode( PDO::FETCH_OBJ );
-      $query->execute( $args );
-      if ( $query->errorCode() ) {
-        return $query;
-      }
-    }
-    if ( TI_DEBUG_MODE ) {
-      show_error( 'Database error', vsprintf('<p><strong>%s</strong> %s</p><p>%s</p>', $this->errorInfo() ) );
-    }
->>>>>>> 728f8736163d15b6000d9365802bc8aeac3462d5
     $query = new PDOStatement;
     return $query;
   }
