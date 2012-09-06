@@ -66,15 +66,16 @@ Example directory structure of app using ti-framework
 .htaccess
 ---------
 
-//  <IfModule mod_rewrite.c>
-//    RewriteEngine On
-//    SetEnv HTTP_MOD_REWRITE On
-//    RewriteRule ^index\.php$ - [L]
-//    RewriteCond %{REQUEST_FILENAME} !-f
-//    RewriteCond %{REQUEST_FILENAME} !-d
-//    RewriteRule . index.php [L]
-//  </IfModule>
-
+```php
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  SetEnv HTTP_MOD_REWRITE On
+  RewriteRule ^index\.php$ - [L]
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule . index.php [L]
+</IfModule>
+```
 
 index.php
 ---------
