@@ -329,11 +329,11 @@ function get_ip() {
   if ( $ip === NULL ) {
     // Correct the ip.
     $ip = array_match_first(
-        'is_ip', array(
-            ifsetor($_SERVER['HTTP_CLIENT_IP']),
-            ifsetor($_SERVER['HTTP_X_FORWARDED_FOR']),
-            ifsetor($_SERVER['REMOTE_ADDR']) ),
-        '000.000.000.000' );
+      'is_ip', array(
+        ifsetor($_SERVER['HTTP_CLIENT_IP']),
+        ifsetor($_SERVER['HTTP_X_FORWARDED_FOR']),
+        ifsetor($_SERVER['REMOTE_ADDR']) ),
+      '000.000.000.000' );
   }
   return do_hook( 'get_ip', $ip );
 }
@@ -351,8 +351,8 @@ endif;
 function load_include($include = '') {
   $include = trim( strtolower( $include ), '/' );
   $possible_files = array(
-      TI_PATH_APP . '/' . TI_FOLDER_INCLUDES . '/' . $include . TI_EXT_INCLUDES,
-      TI_PATH_APP . '/' . TI_FOLDER_INCLUDES . '/' . dirname( $include ). '/class-' . basename( $include ) . TI_EXT_INCLUDES,
+    TI_PATH_APP . '/' . TI_FOLDER_INCLUDES . '/' . $include . TI_EXT_INCLUDES,
+    TI_PATH_APP . '/' . TI_FOLDER_INCLUDES . '/' . dirname( $include ). '/class-' . basename( $include ) . TI_EXT_INCLUDES,
   );
   $possible_files = do_hook( 'load_include', $possible_files, $include );
   foreach ( $possible_files as $file ) {
@@ -2064,7 +2064,7 @@ function add_hook($hook_name, $function, $priority = 10) {
 function do_hook($hook_name, $value = NULL) {
   global $_HOOKS;
   if ( empty( $_HOOKS[$hook_name]) ) {
-    return FALSE;
+    return $value;
   }
   ksort( $_HOOKS[$hook_name] );
   $args = func_get_args();
@@ -3904,6 +3904,10 @@ class Image {
    * @return Image
    */
   public function __construct($filename = '') {
+    if ( !extension_loaded( 'GD' ) ) {
+      show_error( 'System error', 'Image GD extension not available.' );
+      return NULL;
+    }
     if ( $filename ) {
       $this->load_from_file( $filename );
     }
@@ -4484,7 +4488,7 @@ if ( !defined( 'TI_DISABLE_BOOT' )) {
   }
 
   // Register autoloader function.
-  if ( function_exists( 'spl_autoload_register' )) {
+  if ( extension_loaded( 'SPL' )) {
     spl_autoload_register( 'load_include' );
   }
   else {
