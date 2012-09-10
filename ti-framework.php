@@ -231,7 +231,7 @@ function db($db_id = '') {
     $dboptions = array();
   }
   else {
-     parse_str( strtr( $dburi[1], array( ';' => '&', ',' => '&', '#' => '#' ) ), $dboptions );
+    parse_str( strtr( $dburi[1], array( ';' => '&', ',' => '&', '#' => '#' ) ), $dboptions );
   }
   $dboptions = array_merge( array( 'username' => NULL, 'password' => NULL, 'prefix' => '' ), $dboptions );
   $dburi = $dburi[0];
@@ -1353,19 +1353,20 @@ function array_get_path($path = '/', $array = array()) {
  *
  * @param callable $callback
  * @param array $array
+ * @param mixed $default_value
  *
  * @return mixed
  */
-function array_match_first( $callback, $array = array(), $fallback = NULL ) {
+function array_match_first( $callback, $array = array(), $default_value = NULL ) {
   $array = CAST_TO_ARRAY( $array );
-  if ( is_callable( $callback ) && $array ) {
+  if ( is_callable( $callback ) ) {
     foreach ( $array as $element ) {
       if ( call_user_func( $callback, $element ) ) {
         return $element;
       }
     }
   }
-  return $fallback;
+  return $default_value;
 }
 
 /**
@@ -2061,18 +2062,16 @@ function add_hook($hook_name, $function, $priority = 10) {
  * @return mixed
  */
 function do_hook($hook_name, $value = NULL) {
-  if ( !has_hook( $hook_name ) ) {
-    return $value;
-  }
   global $_HOOKS;
+  if ( empty( $_HOOKS[$hook_name]) ) {
+    return FALSE;
+  }
   ksort( $_HOOKS[$hook_name] );
   $args = func_get_args();
   foreach ( $_HOOKS[$hook_name] as $hook_priority ) {
     foreach ( $hook_priority as $hook ) {
-      if ( is_callable( $hook ) ) {
-        $args[0] = $value;
-        $value = call_user_func_array($hook, $args);
-      }
+      $args[0] = $value;
+      $value = call_user_func_array($hook, $args);
     }
   }
   return $value;
@@ -2086,10 +2085,10 @@ function do_hook($hook_name, $value = NULL) {
  * @return bool
  */
 function delete_hook($hook_name) {
-  if (!has_hook($hook_name)) {
+  global $_HOOKS;
+  if ( empty( $_HOOKS[$hook_name]) ) {
     return FALSE;
   }
-  global $_HOOKS;
   $_HOOKS[$hook_name] = array();
   return TRUE;
 }
@@ -2099,12 +2098,11 @@ function delete_hook($hook_name) {
  *
  * @param string $hook_name
  *
- * @return FALSE|int
- *   return the number of callbacks assigned or FALSE if there is no.
+ * @return bool
  */
 function has_hook($hook_name) {
   global $_HOOKS;
-  return empty( $_HOOKS[$hook_name] ) ? FALSE : count( $_HOOKS[$hook_name] );
+  return !empty( $_HOOKS[$hook_name] );
 }
 
 /**
@@ -2215,7 +2213,7 @@ function selected($current = '', $default = 1, $echo = TRUE) {
  */
 function checked($current = '', $default = 1, $echo = TRUE) {
   if ( CAST_TO_STRING($current) === CAST_TO_STRING($default) ) {
-    if ($return) {
+    if ( $echo ) {
       echo ' checked="checked"';
     }
     else {
@@ -2233,7 +2231,7 @@ function checked($current = '', $default = 1, $echo = TRUE) {
  *
  * @return string
  */
-function form_options($array = array(), $default_value = NULL, $return = TRUE) {
+function form_options($array = array(), $default_value = NULL, $echo = TRUE) {
   $array = CAST_TO_ARRAY( $array );
   if (!array_is_assoc($array)) {
     $array = array_combine( array_values($array), array_values($array) );
@@ -2242,10 +2240,12 @@ function form_options($array = array(), $default_value = NULL, $return = TRUE) {
   foreach ( $array as $key => $val ) {
     $options .= '<option value="' . esc_attr($key) . '"' . selected( $key, $default_value ). '>' . esc_attr($val) . '</option>';
   }
-  if ($return) {
+  if ( $echo ) {
+    echo $options;
+  }
+  else {
     return $options;
   }
-  echo $options;
 }
 
 /**
