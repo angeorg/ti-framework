@@ -2,7 +2,7 @@
 
 /**
  * ti-framework.php - The complete framework's code.
- * v0.9.9.3
+ * v0.9.9.4
  *
  * Copyright (c) 2010-2012, e01 <dimitrov.adrian@gmail.com>
  * All rights reserved.
@@ -4365,7 +4365,7 @@ endif;
  */
 
 // Set the framework version.
-define( 'TI_FW_VERSION', '0.9.9.3' );
+define( 'TI_FW_VERSION', '0.9.9.4' );
 
 // Start the timer.
 define( 'TI_TIMER_START', microtime( TRUE ) );
@@ -4484,7 +4484,14 @@ if ( !defined( 'TI_DISABLE_BOOT' )) {
   }
 
   // Register autoloader function.
-  spl_autoload_register( 'load_include' );
+  if ( function_exists( 'spl_autoload_register' )) {
+    spl_autoload_register( 'load_include' );
+  }
+  else {
+    function __autoload($class_name) {
+      load_include( $class_name );
+    }
+  }
 
   // Check for __application.php
   if ( is_readable( TI_PATH_APP . '/' . TI_AUTOLOAD_FILE ) ) {
