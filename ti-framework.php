@@ -3567,23 +3567,37 @@ class TI_Database extends PDO {
     }
     $columns = array();
     switch ( $this->getDriver() ) {
+
       case 'sqlite': case 'sqlite2':
         $querystr = 'PRAGMA TABLE_INFO( ' . $this->tableName( $table ) . ')';
         foreach ( $this->query($querystr)->fetchAll() as $column ) {
           $columns[$column->name] = $column->type;
         }
-        $this->_table_columns_cache[$table] = $columns;
-        return $columns;
+        break;
+
       case 'mysql': case 'pgsql':
         $querystr = 'SELECT column_name, column_type FROM information_schema.columns WHERE table_name = ?';
         $query = $this->query( $querystr, array( $this->prefix . $table ));
         foreach ( $query->fetchAll() as $column ) {
           $columns[$column->column_name] = $column->column_type;
         }
-        $this->_table_columns_cache[$table] = $columns;
-        return $columns;
+        break;
+
+      case 'interbase':
+        $querystr = '
+            SELECT "RDB$FIELD_NAME" AS "name", "RDB$FIELD_SOURCE" AS "type"
+            FROM "RDB$RELATION_FIELDS"
+            WHERE "RDB$RELATION_NAME" = ?;';
+        $query = $this->query( $querystr, array( $this->prefix . $table ));
+        foreach ( $query->fetchAll() as $column ) {
+          $columns[$column->name] = $column->type;
+        }
+        break;
+
+      default: return FALSE;
     }
-    return FALSE;
+    $this->_table_columns_cache[$table] = $columns;
+    return $columns;
   }
 
   /**
