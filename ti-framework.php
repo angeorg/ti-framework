@@ -51,70 +51,68 @@
  * @return void
  */
 function _ti_fix_server_vars() {
-  // Correct the requested URL.
-  if ( TI_DISABLE_MOD_REWRITE ) {
-    if ( empty($_SERVER['REQUEST_URI']) ) {
-      $_SERVER['REQUEST_URI'] = '/';
+  // Fix server vars, all credits to WordPress team.
+  $_SERVER = array_merge( array('SERVER_SOFTWARE' => '', 'REQUEST_URI' => ''), $_SERVER );
+  // Fix for IIS when running with PHP ISAPI.
+  if ( empty( $_SERVER['REQUEST_URI'] ) ||
+      ( php_sapi_name() != 'cgi-fcgi' && preg_match( '/^Microsoft-IIS\//', $_SERVER['SERVER_SOFTWARE'] ) ) ) {
+    // IIS Mod-Rewrite
+    if ( isset( $_SERVER['HTTP_X_ORIGINAL_URL'] ) ) {
+      $_SERVER['REQUEST_URI'] = $_SERVER['HTTP_X_ORIGINAL_URL'];
+    }
+    // IIS Isapi_Rewrite
+    elseif ( isset( $_SERVER['HTTP_X_REWRITE_URL'] ) ) {
+      $_SERVER['REQUEST_URI'] = $_SERVER['HTTP_X_REWRITE_URL'];
+    }
+    else {
+      // Use ORIG_PATH_INFO if there is no PATH_INFO.
+      if ( !isset( $_SERVER['PATH_INFO'] ) && isset( $_SERVER['ORIG_PATH_INFO'] ) ) {
+        $_SERVER['PATH_INFO'] = $_SERVER['ORIG_PATH_INFO'];
+      }
+      // Some IIS + PHP configurations puts the script-name in the path-info (No need to append it twice)
+      if ( isset( $_SERVER['PATH_INFO'] ) ) {
+        if ( $_SERVER['PATH_INFO'] == $_SERVER['SCRIPT_NAME'] ) {
+          $_SERVER['REQUEST_URI'] = $_SERVER['PATH_INFO'];
+        }
+        else {
+          $_SERVER['REQUEST_URI'] = $_SERVER['SCRIPT_NAME'] . $_SERVER['PATH_INFO'];
+        }
+      }
+      // Append the query string if it exists and isn't null.
+      if ( ! empty( $_SERVER['QUERY_STRING'] ) ) {
+        $_SERVER['REQUEST_URI'] .= '?' . $_SERVER['QUERY_STRING'];
+      }
     }
   }
-  else {
-    // Fix server vars, all credits to WordPress team.
-    $_SERVER = array_merge( array('SERVER_SOFTWARE' => '', 'REQUEST_URI' => ''), $_SERVER );
-    // Fix for IIS when running with PHP ISAPI.
-    if ( empty( $_SERVER['REQUEST_URI'] ) ||
-        ( php_sapi_name() != 'cgi-fcgi' && preg_match( '/^Microsoft-IIS\//', $_SERVER['SERVER_SOFTWARE'] ) ) ) {
-      // IIS Mod-Rewrite
-      if ( isset( $_SERVER['HTTP_X_ORIGINAL_URL'] ) ) {
-        $_SERVER['REQUEST_URI'] = $_SERVER['HTTP_X_ORIGINAL_URL'];
-      }
-      // IIS Isapi_Rewrite
-      elseif ( isset( $_SERVER['HTTP_X_REWRITE_URL'] ) ) {
-        $_SERVER['REQUEST_URI'] = $_SERVER['HTTP_X_REWRITE_URL'];
-      }
-      else {
-        // Use ORIG_PATH_INFO if there is no PATH_INFO.
-        if ( !isset( $_SERVER['PATH_INFO'] ) && isset( $_SERVER['ORIG_PATH_INFO'] ) ) {
-          $_SERVER['PATH_INFO'] = $_SERVER['ORIG_PATH_INFO'];
-        }
-        // Some IIS + PHP configurations puts the script-name in the path-info (No need to append it twice)
-        if ( isset( $_SERVER['PATH_INFO'] ) ) {
-          if ( $_SERVER['PATH_INFO'] == $_SERVER['SCRIPT_NAME'] ) {
-            $_SERVER['REQUEST_URI'] = $_SERVER['PATH_INFO'];
-          }
-          else {
-            $_SERVER['REQUEST_URI'] = $_SERVER['SCRIPT_NAME'] . $_SERVER['PATH_INFO'];
-          }
-        }
-        // Append the query string if it exists and isn't null.
-        if ( ! empty( $_SERVER['QUERY_STRING'] ) ) {
-          $_SERVER['REQUEST_URI'] .= '?' . $_SERVER['QUERY_STRING'];
-        }
-      }
-    }
-    // Fix for PHP as CGI hosts that set SCRIPT_FILENAME to something ending in php.cgi for all requests
-    if ( isset( $_SERVER['SCRIPT_FILENAME'] ) && ( strpos( $_SERVER['SCRIPT_FILENAME'], 'php.cgi' )
-        == strlen( $_SERVER['SCRIPT_FILENAME'] ) - 7 ) ) {
-      $_SERVER['SCRIPT_FILENAME'] = $_SERVER['PATH_TRANSLATED'];
-    }
-    // Fix for Dreamhost and other PHP as CGI hosts.
-    if ( strpos( $_SERVER['SCRIPT_NAME'], 'php.cgi' ) !== FALSE ) {
-      unset( $_SERVER['PATH_INFO'] );
-    }
-    // Fix empty PHP_SELF.
-    $PHP_SELF = $_SERVER['PHP_SELF'];
-    if ( empty( $PHP_SELF ) ) {
-      $_SERVER['PHP_SELF'] = $PHP_SELF = preg_replace( '/(\?.*)?$/', '', $_SERVER["REQUEST_URI"] );
-    }
+  // Fix for PHP as CGI hosts that set SCRIPT_FILENAME to something ending in php.cgi for all requests
+  if ( isset( $_SERVER['SCRIPT_FILENAME'] ) && ( strpos( $_SERVER['SCRIPT_FILENAME'], 'php.cgi' )
+      == strlen( $_SERVER['SCRIPT_FILENAME'] ) - 7 ) ) {
+    $_SERVER['SCRIPT_FILENAME'] = $_SERVER['PATH_TRANSLATED'];
   }
+  // Fix for Dreamhost and other PHP as CGI hosts.
+  if ( strpos( $_SERVER['SCRIPT_NAME'], 'php.cgi' ) !== FALSE ) {
+    unset( $_SERVER['PATH_INFO'] );
+  }
+  // Fix empty PHP_SELF.
+  $PHP_SELF = $_SERVER['PHP_SELF'];
+  if ( empty( $PHP_SELF ) ) {
+    $_SERVER['PHP_SELF'] = $PHP_SELF = preg_replace( '/(\?.*)?$/', '', $_SERVER["REQUEST_URI"] );
+  }
+
   // Sanitize $_SERVER['REQUEST_URI']
   $_SERVER['REQUEST_URI'] = string_sanitize( strip_tags( $_SERVER['REQUEST_URI'] ) );
   $_SERVER['REQUEST_URI'] = strtr( $_SERVER['REQUEST_URI'], array( '../' => '', './' => '' ) );
 
   // Preset ti-framework's REQUSET_URI
-  $_SERVER['REQUEST_URI'] = '/' . trim( substr( $_SERVER['REQUEST_URI'], strlen( pathinfo( $_SERVER['PHP_SELF'], PATHINFO_DIRNAME ) ) ), '/' );
+  if ( TI_DISABLE_MOD_REWRITE ) {
+    $_SERVER['REQUEST_URI'] = ltrim( trim( $_SERVER['REQUEST_URI'], '/' ), '?' );
+  }
+  else {
+    $_SERVER['REQUEST_URI'] = '/' . trim( substr( $_SERVER['REQUEST_URI'], strlen( pathinfo( $_SERVER['PHP_SELF'], PATHINFO_DIRNAME ) ) ), '/' );
+  }
 
   // Set TI_HOME if we are on root.
-  if ( $_SERVER['REQUEST_URI'] == '/' ) {
+  if ( !$_SERVER['REQUEST_URI'] || $_SERVER['REQUEST_URI'] === '/' ) {
     $_SERVER['REQUEST_URI'] = TI_HOME;
   }
 }
@@ -3359,7 +3357,7 @@ function load_page($url = '', $return = FALSE) {
   $url_args = array();
   do {
     $path = implode( '/', $url_segments );
-    $class = ucfirst( end( $url_segments ) ) . 'Controller';
+    $class = end( $url_segments ) . 'Controller';
     if ( $path && $class ) {
       $controller_path = TI_PATH_APP . '/' . TI_FOLDER_CONTROLLER . '/' . strtolower( $path ) . TI_EXT_CONTROLLER;
       if ( is_readable( $controller_path )) {
@@ -4396,7 +4394,7 @@ defined( 'TI_DEBUG_MODE') or define( 'TI_DEBUG_MODE', FALSE );
 
 // Detect application path.
 if ( !defined( 'TI_PATH_APP' ) ) {
-  define( 'TI_PATH_APP', pathinfo( realpath( $_SERVER['SCRIPT_FILENAME'] ), PATHINFO_DIRNAME )  . '/application' );
+  define( 'TI_PATH_APP', pathinfo( realpath( $_SERVER['SCRIPT_FILENAME'] ), PATHINFO_DIRNAME ) . '/application' );
   if ( !TI_PATH_APP ) {
     die( 'Application path not defined.' );
   }
@@ -4518,5 +4516,4 @@ if ( !defined( 'TI_DISABLE_BOOT' )) {
 /**
  * @} End of "defgroup framework bootstrap".
  */
-
 return TRUE;
