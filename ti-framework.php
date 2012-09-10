@@ -111,7 +111,7 @@ function _ti_fix_server_vars() {
   $_SERVER['REQUEST_URI'] = strtr( $_SERVER['REQUEST_URI'], array( '../' => '', './' => '' ) );
 
   // Preset ti-framework's REQUSET_URI
-  $_SERVER['REQUEST_URI'] = '/' . trim( substr( $_SERVER['REQUEST_URI'], strlen( pathinfo( $_SERVER['PHP_SELF'], PATHINFO_DIRNAME ) ) -1 ), '/' );
+  $_SERVER['REQUEST_URI'] = '/' . trim( substr( $_SERVER['REQUEST_URI'], strlen( pathinfo( $_SERVER['PHP_SELF'], PATHINFO_DIRNAME ) ) ), '/' );
 
   // Set TI_HOME if we are on root.
   if ( $_SERVER['REQUEST_URI'] == '/' ) {
@@ -4429,8 +4429,7 @@ if ( $_SERVER['REQUEST_URI'] === site_url( 'favicon.ico' )) {
   exit;
 }
 // Show documentation or continue with the app.
-if ( defined('TI_DOCUMENTATION') && is_string( TI_DOCUMENTATION )
-    && TI_DOCUMENTATION && $_SERVER['REQUEST_URI'] === site_url( TI_DOCUMENTATION ) ) {
+if ( defined('TI_DOCUMENTATION') && is_string( TI_DOCUMENTATION ) && TI_DOCUMENTATION && $_SERVER['REQUEST_URI'] === '/' . TI_DOCUMENTATION ) {
   include dirname( __FILE__ ) . '/ti-framework-documentation.php';
   exit;
 }
