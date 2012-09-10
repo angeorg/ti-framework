@@ -1670,7 +1670,7 @@ function http_query($url, $method = 'GET', $data = NULL, $timeout = 30) {
   $headers = do_hook( 'http_query_headers', $headers, $query );
 
   // Prefere curl before fsockopen.
-  if ( function_exists( 'curl_init' )) {
+  if ( extension_loaded( 'curl' ) ) {
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, $url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
@@ -4111,7 +4111,7 @@ class Image {
   public function resize_to_width($width, $preserve_smaller = TRUE) {
     $ratio = $width / imagesx( $this->im );
     $height = imagesy( $this->im ) * $ratio;
-    return $this->resize ($width, $height, $preserve_smaller );
+    return $this->resize( $width, $height, $preserve_smaller );
   }
 
   /**
