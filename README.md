@@ -19,14 +19,14 @@ you need from MOD_REWRITE
             www
             <ul>
               <li> index.php </li>
-              <li> helloworld.php </li>
+              <li> <a href="#appwwwhelloworldphp">helloworld.php</a> </li>
             </ul>
           </li>
           <li>
             html
             <ul>
               <li> index.html </li>
-              <li> helloworld.html </li>
+              <li> <a href="#apphtmlhelloworldphp">helloworld.html</a> </li>
               <li> header.html </li>
               <li> footer.html </li>
             </ul>
@@ -48,11 +48,11 @@ you need from MOD_REWRITE
           <li> ti-framework.php </li>
           <li> ti-framework-documentation.php </li>
           <li> README.md </li>
-          <li> .htaccess </li>
+          <li> <a href="#htaccess">.htaccess</a> </li>
         </ul>
       </li>
       <li>
-        index.php
+        <a href="#indexphp">index.php</a>
       </li>
     </ul>
   </li>
