@@ -116,13 +116,9 @@ index.php
 //define( 'TI_FOLDER_CONTROLLER',    'www' );
 
 // Set MVC file extensions
-//define( 'TI_EXT_INC',              '.php' );
+//define( 'TI_EXT_INCLUDES',         '.php' );
 //define( 'TI_EXT_VIEW',             '.html' );
 //define( 'TI_EXT_CONTROLLER',       '.php' );
-
-// Autorender, when this option is enabled, then when controller is loaded,
-// it will automatic call &#36;this->render(<controller>)
-//define( 'TI_AUTORENDER',            FALSE );
 
 // Autoload this file (<TI_PATH_APP>/TI_AUTOLOAD_FILE) on bootstrap
 //define( 'TI_AUTOLOAD_FILE',         '__application.php' );

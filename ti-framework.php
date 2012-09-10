@@ -435,19 +435,14 @@ function match_url($pattern = '') {
  *
  * @fire site_url
  *
- * @param string $url
- * @param bool $fullpath
- *   return URI (protocol://host/path)
+ * @param string|array $url
+ * @param string ...
+ * @param string $urlpartN
  *
  * @return string
  *   complete url
  */
-function site_url($url = '', $fullpath = FALSE) {
-
-  if ( $fullpath ) {
-    return site_url_external( site_url( $url ) );
-  }
-
+function site_url($url = '') {
   if ( func_num_args() > 1 ) {
     $url = func_get_args();
   }
@@ -756,24 +751,6 @@ function _e($string = '') {
  */
 function _n($string_single = '', $string_plural = '', $number = 1) {
   return $number === 1 ? __( $string_single ) : __( $string_plural );
-}
-
-/**
- * Elapsed time from application start
- *
- * @return double
- */
-function elapsed_time() {
-  return round( microtime(TRUE) - TI_TIMER_START, 5);
-}
-
-/**
- * Currently memory usage
- *
- * @return double
- */
-function memory_usage() {
-  return memory_get_usage( TRUE );
 }
 
 /**
@@ -1344,22 +1321,20 @@ function array_group_by($array = array(), $key = 0) {
  *
  * @return array
  */
-function array_get_by_path($path = '/', $array = array()) {
-  $path = trim( preg_replace( '/\/{2,}/', '/', $path ), '/ ' );
+function array_get_path($path = '/', $array = array()) {
+  $path = array_filter( explode( '/', trim( $path, '/' ) ) );
   if (!$path) {
     return $array;
   }
-  $path = explode( '/', $path );
-  $current_pointer = & $array;
   foreach ( $path as $segment ) {
-    if ( isset( $current_pointer[$segment] ) ) {
-      $current_pointer = & $current_pointer[$segment];
+    if ( is_array( $array ) && array_key_exists( $segment, $array ) ) {
+      $array = $array[$segment];
     }
     else {
       return NULL;
     }
   }
-  return $current_pointer;
+  return $array;
 }
 
 /**
@@ -2214,17 +2189,17 @@ function esc_attr($string = '') {
  *
  * @param mixed $current
  * @param mixed $default
- * @param bool $return
+ * @param bool $echo
  *
  * @return NULL|string
  */
-function selected($current = '', $default = 1, $return = TRUE) {
+function selected($current = '', $default = 1, $echo = TRUE) {
   if ( CAST_TO_STRING($current) === CAST_TO_STRING($default) ) {
-    if ( $return ) {
-      return ' selected="selected"';
+    if ( $echo ) {
+      echo ' selected="selected"';
     }
     else {
-      echo ' selected="selected"';
+      return ' selected="selected"';
     }
   }
 }
@@ -2234,17 +2209,17 @@ function selected($current = '', $default = 1, $return = TRUE) {
  *
  * @param mixed $current
  * @param mixed $default
- * @param bool $return
+ * @param bool $echo
  *
  * @return NULL|string
  */
-function checked($current = '', $default = 1, $return = TRUE) {
+function checked($current = '', $default = 1, $echo = TRUE) {
   if ( CAST_TO_STRING($current) === CAST_TO_STRING($default) ) {
     if ($return) {
-      return ' checked="checked"';
+      echo ' checked="checked"';
     }
     else {
-      echo ' checked="checked"';
+      return ' checked="checked"';
     }
   }
 }
@@ -3161,13 +3136,16 @@ function dec_to_roman($decimal = 0) {
  * @return string
  */
 function num_to_month($num = 0, $long_names = FALSE) {
+  if ( !$num ) {
+    $num = date( 'm' );
+  }
   if ( $long_names ) {
     $months = array( 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December' );
   }
   else {
     $months = array( 'Jan.', 'Feb.', 'Mar.', 'Apr.', 'May', 'Jun.', 'Jul.', 'Aug.', 'Sep.', 'Oct.', 'Nov.', 'Dec.' );
   }
-  return isset( $months[$num+1] ) ? $months[$num+1] : NULL;
+  return isset( $months[$num-1] ) ? $months[$num-1] : NULL;
 }
 
 /**
@@ -3519,7 +3497,7 @@ class TI_Database extends PDO {
    *
    * @var array
    */
-  private $_table_columns_cache = array();
+  protected $_table_columns_cache = array();
 
   /**
    * Database table's prefix
@@ -3584,8 +3562,8 @@ class TI_Database extends PDO {
    *   or FALSE on failure
    */
   public function getColumns($table) {
-    if ( isset($this->_table_structures[$table]) ) {
-      return $this->_table_structures[$table];
+    if ( isset($this->_table_columns_cache[$table]) ) {
+      return $this->_table_columns_cache[$table];
     }
     $columns = array();
     switch ( $this->getDriver() ) {
@@ -3594,7 +3572,7 @@ class TI_Database extends PDO {
         foreach ( $this->query($querystr)->fetchAll() as $column ) {
           $columns[$column->name] = $column->type;
         }
-        $this->_table_structures[$table] = $columns;
+        $this->_table_columns_cache[$table] = $columns;
         return $columns;
       case 'mysql': case 'pgsql':
         $querystr = 'SELECT column_name, column_type FROM information_schema.columns WHERE table_name = ?';
@@ -3602,7 +3580,7 @@ class TI_Database extends PDO {
         foreach ( $query->fetchAll() as $column ) {
           $columns[$column->column_name] = $column->column_type;
         }
-        $this->_table_structures[$table] = $columns;
+        $this->_table_columns_cache[$table] = $columns;
         return $columns;
     }
     return FALSE;
@@ -3713,7 +3691,7 @@ class TI_Database extends PDO {
     $querystr .= ' VALUES ' . implode( ', ', $vals_str );
     $query = $this->prepare( $querystr );
     $query->execute( $vals );
-    return count($elements_multiple) > 1 ? $this->rowCount() : $this->lastInsertId();
+    return count($elements_multiple) > 1 ? $query->rowCount() : $this->lastInsertId();
   }
 
   /**
