@@ -1,19 +1,13 @@
-About ti-framework
-==================
-
-Non-objective PHP MVC framework
+<h2>About ti-framework</h2>
+Configuration-less, one-file lightweight PHP MVC framework.
 
 
-Usage
-=====
-
+<h2>Usage</h2>
 ti-framework needs some config instruction be in your index file, and .htaccess file in case
 you need from MOD_REWRITE
 
 
-Example directory structure of app using ti-framework
------------------------------------------------------
-
+<h3>Example directory structure of app using ti-framework</h3>
 <ul>
   <li>
     /app-root
@@ -26,6 +20,7 @@ Example directory structure of app using ti-framework
             <ul>
               <li> index.php </li>
               <li> helloworld.php </li>
+            </ul>
           </li>
           <li>
             html
@@ -63,10 +58,9 @@ Example directory structure of app using ti-framework
   </li>
 </ul>
 
-.htaccess
----------
 
-```php
+<h3>.htaccess</h3>
+<pre>
 <IfModule mod_rewrite.c>
   RewriteEngine On
   SetEnv HTTP_MOD_REWRITE On
@@ -75,11 +69,10 @@ Example directory structure of app using ti-framework
   RewriteCond %{REQUEST_FILENAME} !-d
   RewriteRule . index.php [L]
 </IfModule>
-```
+</pre>
 
-index.php
----------
 
+<h3>index.php</h3>
 ```php
 <?php
 
@@ -127,7 +120,11 @@ index.php
 //define( 'TI_FOLDER_CACHE',         'cache' );
 
 // Setup databases
+
+// accessed via db()->...
 //define( 'TI_DB',                    'mysql:dbname=test;host=localhost,username=user1;password=passWord;prefix=ti_;charset=UTF8');
+
+// accessed via db('priv')->...
 //define( 'TI_DB_priv',               'sqlite:somedbfile.sqlite');
 
 // ti-framework documentation url (http://example.com/<TI_DOCUMENTATION>)
@@ -137,26 +134,46 @@ index.php
 // This is all required line that you have to have in this file  //
 // Includation instruction to the TI's framework.php             //
 // ------------------------------------------------------------- //
-include 'ti/ti-framework.php';
+include '<path_to>/ti-framework.php';
 
 ```
 
-Requirements
-============
+<h3>app/www/helloworld.php</h3>
+```php
 
-* PHP >= 5.2.0
-* PDO (in case of using databases)
+class HelloWorld extends TI_Controller {
+
+  function Index() {
+    $this->render( 'index' );
+  }
+  
+  function Say($name = 'John Doe') {
+    $this->name = '$name;
+    $this->render( 'helloworld' );
+  }
+
+}
+
+```
+
+<h3>app/html/helloworld.php</h3>
+```php
+<p> Hello, my name is <?php echo $this->name?> </p>
+```
 
 
-Copyright
-=========
+<h2>Requirements</h2>
+<ul>
+  <li>PHP >= 5.2.0</li>
+  <li>PDO (in case of using databases)</li>
+</ul>
 
+
+<h2>Copyright</h2>
 Some functions are copy from WordPress and Drupal,
 so all credentials goes to their teams.
 
-Reporting Issues
-================
 
+<h2>Reporting Issues</h2>
 I would love to hear your feedback. Report issues using the [Github
-Issue Tracker](https://github.com/dimitrov-adrian/ti-framework/issues) or email
-[dimitrov.adrian@gmail.com](mailto:dimitrov.adrian@gmail.com).
+Issue Tracker](https://github.com/dimitrov-adrian/ti-framework/issues) or email dimitrov.adrian[at]gmail.com
