@@ -118,29 +118,6 @@ function _ti_fix_server_vars() {
 }
 
 /**
- * Wrapper for session_start() used from ti-framework bootstrap
- *
- * @access private
- *
- * @return void
- */
-function _ti_session_start() {
-  if ( !headers_sent() ) {
-    // Instantinate session.
-    if ( !session_id() ) {
-      session_start();
-    }
-    if ( ifsetor( $_SESSION['_ti_client'] ) !== make_hash( get_ip() . $_SERVER['HTTP_USER_AGENT'] )
-        || ifsetor( $_SESSION['_ti_id'] ) !== make_hash( session_id() ) ) {
-
-      $_SESSION['_ti_client'] = make_hash( get_ip() . $_SERVER['HTTP_USER_AGENT'] );
-      $_SESSION['_ti_id'] = make_hash( session_id() );
-    }
-    session_regenerate_id();
-  }
-}
-
-/**
  * Message Bus class
  * Store messages per page here.
  * If this function is called with argument text,
@@ -260,6 +237,15 @@ function db($db_id = '') {
   }
 }
 
+/**
+ * Elapsed time from application start
+ *
+ * @return double
+ */
+function elapsed_time() {
+  return round( microtime(TRUE) - TI_TIMER_START, 5);
+}
+
 if ( !function_exists( 'is_cli' )):
 /**
  * Is the application run in command line mode
@@ -267,7 +253,7 @@ if ( !function_exists( 'is_cli' )):
  * @return bool
  */
 function is_cli() {
-  return PHP_SAPI == 'cli';
+  return PHP_SAPI === 'cli';
 }
 endif;
 
@@ -3310,14 +3296,14 @@ function transliterate($string = '', $from_latin = FALSE) {
  * Load URL when define new object of Application with parameters.
  *
  * <?php
- *  add_hook( 'url_rewrites', function($rules) {
+ *  add_hook( 'url_rewrite', function($rules) {
  *    $rules['create-new'] = 'users/0/create';
  *    $rules['edit-user-(.+)'] = 'users/$1/edit';
  *    return $rules;
  *  });
  * ?>
  *
- * @fire url_rewrites
+ * @fire load_page
  *
  * @param string $url
  *   url to the controller
@@ -3346,7 +3332,6 @@ function load_page($url = '', $return = FALSE) {
       break;
     }
   }
-
   // Protect private controllers.
   if ($is_main && preg_match( '#\/(\_|\.)#', $url ) ) {
     show_404();
@@ -3359,10 +3344,10 @@ function load_page($url = '', $return = FALSE) {
     $path = implode( '/', $url_segments );
     $class = end( $url_segments ) . 'Controller';
     if ( $path && $class ) {
-      $controller_path = TI_PATH_APP . '/' . TI_FOLDER_CONTROLLER . '/' . strtolower( $path ) . TI_EXT_CONTROLLER;
-      if ( is_readable( $controller_path )) {
+      $path = TI_PATH_APP . '/' . TI_FOLDER_CONTROLLER . '/' . $path . TI_EXT_CONTROLLER;
+      if ( is_readable( $path )) {
         $is_main = FALSE;
-        include_once $controller_path;
+        include_once $path;
         if ( ( $method = array_pop( $url_args ) ) === NULL ) {
           $method = 'Index';
         }
@@ -3419,16 +3404,13 @@ class TI_Controller {
    *   when TRUE is given, then if the view not exists, then not show an error.
    */
   protected function render($view = '', $return = FALSE, $noerror = FALSE) {
-
     if ( $return ) {
       ob_start();
       $this->render( $view, FALSE, $noerror );
       return ob_get_clean();
     }
-
     $__NOERROR__ = $noerror;
     unset( $noerror );
-
     if ( $view ) {
       $view = strtolower( string_sanitize( do_hook( 'page_render', $view ) ) );
       $__VIEW__ = TI_PATH_APP . '/' . TI_FOLDER_VIEW  . '/' .  $view . TI_EXT_VIEW;
@@ -3582,10 +3564,7 @@ class TI_Database extends PDO {
         break;
 
       case 'interbase':
-        $querystr = '
-            SELECT "RDB$FIELD_NAME" AS "name", "RDB$FIELD_SOURCE" AS "type"
-            FROM "RDB$RELATION_FIELDS"
-            WHERE "RDB$RELATION_NAME" = ?;';
+        $querystr = 'SELECT "RDB$FIELD_NAME" AS "name", "RDB$FIELD_SOURCE" AS "type" FROM "RDB$RELATION_FIELDS" WHERE "RDB$RELATION_NAME" = ?;';
         $query = $this->query( $querystr, array( $this->prefix . $table ));
         foreach ( $query->fetchAll() as $column ) {
           $columns[$column->name] = $column->type;
@@ -3753,8 +3732,7 @@ class TI_Database extends PDO {
       else {
         $cond_str = $this->buildKeypairClause($condition, $args, 'WHERE', 'AND');
       }
-      $querystr = 'UPDATE ' . $this->tableName( $table ) . $set_str .
-          $this->buildKeypairClause($condition, $args, 'WHERE', 'AND');
+      $querystr = 'UPDATE ' . $this->tableName( $table ) . $set_str . $this->buildKeypairClause($condition, $args, 'WHERE', 'AND');
       return $this->query($querystr, $args)->rowCount();
     }
     else {
@@ -3823,11 +3801,10 @@ class TI_Messagebus {
    */
   public function add($text = '', $title = '', $class = '', $attributes = array()) {
     $o = new stdClass;
-    $o->title = CAST_TO_STRING($title);
+    $o->title = CAST_TO_STRING( $title );
     $o->text = CAST_TO_STRING( $text );
     $o->class = CAST_TO_STRING( $class );
     $o->attributes = CAST_TO_OBJECT( $attributes );
-
     if ( !$o->text ) {
       return FALSE;
     }
@@ -4420,7 +4397,7 @@ defined( 'TI_FOLDER_CACHE' )        or define( 'TI_FOLDER_CACHE', 'cache' );
 _ti_fix_server_vars();
 
 // Exit if favicon request detected.
-if ( $_SERVER['REQUEST_URI'] === site_url( 'favicon.ico' )) {
+if ( $_SERVER['REQUEST_URI'] === '/favicon.ico' ) {
   header( 'Expires: ' . gmdate( 'D, d M Y H:i:s', time() + 60 * 60 ) . 'GMT' );
   header( 'Content-Type: image/vnd.microsoft.icon' );
   header( 'Content-Length: 0' );
@@ -4463,7 +4440,15 @@ if ( !defined( 'TI_DISABLE_BOOT' )) {
   // Start sesion.
   defined( 'TI_DISABLE_SESSION' ) or define( 'TI_DISABLE_SESSION', FALSE );
   if ( !TI_DISABLE_SESSION ) {
-    _ti_session_start();
+    if ( !session_id() ) {
+      session_start();
+    }
+    if ( ifsetor( $_SESSION['_ti_client'] ) !== make_hash( get_ip() . $_SERVER['HTTP_USER_AGENT'] )
+        || ifsetor( $_SESSION['_ti_id'] ) !== make_hash( session_id() ) ) {
+      $_SESSION['_ti_client'] = make_hash( get_ip() . $_SERVER['HTTP_USER_AGENT'] );
+      $_SESSION['_ti_id'] = make_hash( session_id() );
+    }
+    session_regenerate_id();
   }
 
   // Set default timezone.
@@ -4479,9 +4464,9 @@ if ( !defined( 'TI_DISABLE_BOOT' )) {
   unset( $_REQUEST, $_ENV, $HTTP_RAW_POST_DATA, $GLOBALS, $argc, $argv );
 
   // If is not cli and the REMOTE_ADDR is empty, then something is wrong.
-  if ( !is_cli() && empty( $_SERVER['REMOTE_ADDR'] ) ) {
+  if ( empty( $_SERVER['REMOTE_ADDR'] ) && !is_cli() ) {
     error_log( 'ti-framework: Request from unknown user.' );
-    die( 'Permission denied' );
+    show_error( 'Permission denied', 'Unauthorized access' );
   }
 
   // Register autoloader function.
