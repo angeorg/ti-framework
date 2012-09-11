@@ -4484,6 +4484,11 @@ if ( !defined( 'TI_DISABLE_BOOT' )) {
     include TI_PATH_APP . '/' . TI_AUTOLOAD_FILE;
   }
 
+  // Do the init hook, ofcourse it is the same as executing code,
+  // in the autoloaded file, but with the hook is more elegance way.
+  // @fire init
+  do_hook( 'init' );
+
   // Register shutdown hook.
   // @fire shutdown
   register_shutdown_function( 'do_hook', 'shutdown' );

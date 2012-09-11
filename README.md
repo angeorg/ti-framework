@@ -38,16 +38,16 @@ The example here demonstrate how to build a simple Hello World app with one cont
               <li> class-someclass.php </li>
             </ul>
           </li>
-          <li> <a href="#appapplicationphp">__application.php</a> </li>
+          <li> <a href="#app__applicationphp">__application.php</a> </li>
         </ul>
       </li>
       <li>
         ti
         <ul>
+          <li> <a href="#htaccess">.htaccess</a> </li>
+          <li> README.md </li>
           <li> ti-framework.php </li>
           <li> ti-framework-documentation.php </li>
-          <li> README.md </li>
-          <li> <a href="#htaccess">.htaccess</a> </li>
         </ul>
       </li>
       <li>
