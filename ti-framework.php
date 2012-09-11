@@ -3044,21 +3044,6 @@ function substr_middle($string = '', $length = 255, $separate = '&#8230;') {
 }
 
 /**
- * Strip duplicated chars.
- *
- * <?php
- *   echp strip_duplicated_chars('Helllo MyyFriend __1'); // Helo MyFriend _1
- * ?>
- *
- * @param string $string
- *
- * @return string
- */
-function strip_duplicated_chars($string = '') {
-  return preg_replace( '{(.)\1+}', '$1', $string );
-}
-
-/**
  * Upper word by a char.
  *
  * <?php
@@ -3072,17 +3057,6 @@ function strip_duplicated_chars($string = '') {
  */
 function ucwords_by_char($string = '', $char = '-') {
   return strtr( ucwords( strtr( trim( $string ), $char, ' ' . $char ) ), ' ', $char );
-}
-
-/**
- * Strip more than one whitespace.
- *
- * @param string $text
- *
- * @return string
- */
-function strip_whitespaces($text = '') {
-  return trim( preg_replace( '/(\t|\s)+/', ' ', $text ) );
 }
 
 /**
@@ -3213,9 +3187,7 @@ function sql_type_to_widget( $type = '' ) {
  * @return bool
  */
 function sql_is_time_interval( $string = '' ) {
-  return preg_match( '/^\d{1,3}\s(MINUTE|HOUR|DAY|WEEK|MONTH|YEAR)$/i', CAST_TO_STRING( $string ) )
-    ? TRUE
-    : FALSE;
+  return preg_match( '/^\d{1,3}\s(MINUTE|HOUR|DAY|WEEK|MONTH|YEAR)$/i', CAST_TO_STRING( $string ) ) ? TRUE : FALSE;
 }
 
 /**
@@ -3344,8 +3316,8 @@ function load_page($url = '', $return = FALSE) {
     $path = implode( '/', $url_segments );
     $class = end( $url_segments ) . 'Controller';
     if ( $path && $class ) {
-      $path = TI_PATH_APP . '/' . TI_FOLDER_CONTROLLER . '/' . $path . TI_EXT_CONTROLLER;
-      if ( is_readable( $path )) {
+      $path = realpath( TI_PATH_APP . '/' . TI_FOLDER_CONTROLLER . '/' . $path . TI_EXT_CONTROLLER );
+      if ( $path && is_readable( $path )) {
         $is_main = FALSE;
         include_once $path;
         if ( ( $method = array_pop( $url_args ) ) === NULL ) {
@@ -4443,8 +4415,7 @@ if ( !defined( 'TI_DISABLE_BOOT' )) {
     if ( !session_id() ) {
       session_start();
     }
-    if ( ifsetor( $_SESSION['_ti_client'] ) !== make_hash( get_ip() . $_SERVER['HTTP_USER_AGENT'] )
-        || ifsetor( $_SESSION['_ti_id'] ) !== make_hash( session_id() ) ) {
+    if ( ifsetor( $_SESSION['_ti_client'] ) !== make_hash( get_ip() . $_SERVER['HTTP_USER_AGENT'] ) || ifsetor( $_SESSION['_ti_id'] ) !== make_hash( session_id() ) ) {
       $_SESSION['_ti_client'] = make_hash( get_ip() . $_SERVER['HTTP_USER_AGENT'] );
       $_SESSION['_ti_id'] = make_hash( session_id() );
     }
@@ -4484,14 +4455,14 @@ if ( !defined( 'TI_DISABLE_BOOT' )) {
     include TI_PATH_APP . '/' . TI_AUTOLOAD_FILE;
   }
 
+  // Register shutdown hook.
+  // @fire shutdown
+  register_shutdown_function( 'do_hook', 'shutdown' );
+
   // Do the init hook, ofcourse it is the same as executing code,
   // in the autoloaded file, but with the hook is more elegance way.
   // @fire init
   do_hook( 'init' );
-
-  // Register shutdown hook.
-  // @fire shutdown
-  register_shutdown_function( 'do_hook', 'shutdown' );
 
   // Let boot the app.
   load_page( $_SERVER['REQUEST_URI'], FALSE );
