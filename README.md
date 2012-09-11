@@ -4,14 +4,13 @@ Configuration-less, one-file lightweight PHP MVC framework.
 
 <h2>Usage</h2>
 ti-framework needs some config instruction be in your index file, and .htaccess file in case
-you need from MOD_REWRITE.
-The example here demonstrate how to build a simple Hello World app with one controller, which response on app address `/helloworld/say/DoeJohn`
+you need from MOD_REWRITE
 
 
-<h3>Example directory structure</h3>
+<h3>Example directory structure of app using ti-framework</h3>
 <ul>
   <li>
-    ti-example-app
+    /app-root
     <ul>
       <li>
         app
@@ -61,7 +60,7 @@ The example here demonstrate how to build a simple Hello World app with one cont
 
 
 <h3>.htaccess</h3>
-```
+<pre>
 <IfModule mod_rewrite.c>
   RewriteEngine On
   SetEnv HTTP_MOD_REWRITE On
@@ -70,7 +69,7 @@ The example here demonstrate how to build a simple Hello World app with one cont
   RewriteCond %{REQUEST_FILENAME} !-d
   RewriteRule . index.php [L]
 </IfModule>
-```
+</pre>
 
 
 <h3>index.php</h3>
@@ -135,13 +134,12 @@ The example here demonstrate how to build a simple Hello World app with one cont
 // This is all required line that you have to have in this file  //
 // Includation instruction to the TI's framework.php             //
 // ------------------------------------------------------------- //
-include '<PATH_TO_FRAMEWORK_DIR>/ti-framework.php';
+include '<path_to>/ti-framework.php';
 
 ```
 
 <h3>app/www/helloworld.php</h3>
 ```php
-<?php
 
 class HelloWorld extends TI_Controller {
 
@@ -150,7 +148,7 @@ class HelloWorld extends TI_Controller {
   }
   
   function Say($name = 'John Doe') {
-    $this->name = $name;
+    $this->name = '$name;
     $this->render( 'helloworld' );
   }
 
@@ -160,11 +158,7 @@ class HelloWorld extends TI_Controller {
 
 <h3>app/html/helloworld.php</h3>
 ```php
-<?php $this->render('header')?>
-
 <p> Hello, my name is <?php echo $this->name?> </p>
-
-<?php $this->render('footer')?>
 ```
 
 
