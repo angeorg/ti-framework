@@ -38,9 +38,7 @@ The example here demonstrate how to build a simple Hello World app with one cont
               <li> class-someclass.php </li>
             </ul>
           </li>
-          <li>
-            __application.php
-          </li>
+          <li> <a href="#appapplicationphp">__application.php</a> </li>
         </ul>
       </li>
       <li>
@@ -151,6 +149,7 @@ class HelloWorld extends TI_Controller {
   
   function Say($name = 'John Doe') {
     $this->name = $name;
+    $this->SomeClass = new SomeClass;
     $this->render( 'helloworld' );
   }
 
@@ -167,6 +166,18 @@ class HelloWorld extends TI_Controller {
 <?php $this->render('footer')?>
 ```
 
+<h3>app/__application.php</h3>
+```php
+<?php
+
+load_include('somehelper');
+
+add_hook( 'url_rewrite', function($rules) {
+  $rules['say-(.+)'] = 'helloworld/say/$1';
+  return $rules;
+});
+
+```
 
 <h2>Requirements</h2>
 <ul>
