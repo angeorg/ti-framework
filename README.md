@@ -146,7 +146,7 @@ class HelloWorld extends TI_Controller {
   function Index() {
     $this->render( 'index' );
   }
-  
+
   function Say($name = 'John Doe') {
     $this->name = $name;
     $this->SomeClass = new SomeClass;
@@ -182,7 +182,10 @@ add_hook( 'url_rewrite', function($rules) {
 <h2>Requirements</h2>
 <ul>
   <li>PHP >= 5.2.0</li>
-  <li>PDO (in case of using databases)</li>
+  <li>PDO (OPTIONAL, in case of using databases)</li>
+  <li>cURL (OPTIONAL)</li>
+  <li>Memcache (OPTIONAL)</li>
+  <li>gettext (OPTIONAL)</li>
 </ul>
 
 
