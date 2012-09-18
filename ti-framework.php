@@ -1868,7 +1868,7 @@ endif;
  * @return bool
  */
 function cookie_set($name, $value = '', $expire = 0, $path = '', $domain = '', $secure = FALSE, $httponly = FALSE) {
-  $value = CAST_TO_STRING($value);
+  $value = CAST_TO_STRING( $value );
   $_COOKIE[$name] = $value;
   return setcookie($name, $value, $expire, $path, $domain, $secure, $httponly);
 }
@@ -1928,7 +1928,7 @@ function session_set($key = '', $value = '') {
  */
 function session_delete($key = '') {
   if ( is_array( $key ) || is_object( $key ) ) {
-    return array_walk ( $key, 'session_delete' );
+    return array_walk( $key, 'session_delete' );
   }
   unset( $_SESSION[$key] );
   return TRUE;
@@ -2191,29 +2191,37 @@ function cache_obj($key, $bin) {
 
   static $memcache_obj = NULL;
 
-  if ( $memcache_obj || TI_CACHE_MEMCACHE ) {
+  $hash = md5( $bin ) . md5( $key );
+
+  if ( TI_CACHE_MEMCACHE ) {
     if ( !extension_loaded( 'memcache' ) ) {
       $memcache_obj = FALSE;
     }
-    else {
-      if ( $memcache_obj === NULL ) {
-        $memcache_obj = new Memcache;
-        $servers = 0;
-        foreach( explode( ',', TI_CACHE_MEMCACHE ) as $server ) {
-          $server = explode( ':', $server );
-          $server[0] = trim( $server[0] );
-          $server[1] = empty( $server[1] ) ? NULL : trim( $server[1] );
-          if ( $memcache_obj->connect( $server[0], $server[1] ) ) {
-            $servers++;
-          }
-        }
+    if ( $memcache_obj === NULL ) {
+      $memcache_obj = new Memcache;
+      foreach( explode( ',', TI_CACHE_MEMCACHE ) as $server ) {
+        $server = explode( ':', $server );
+        $server[0] = trim( $server[0] );
+        $server[1] = empty( $server[1] ) ? NULL : trim( $server[1] );
+        $memcache_obj->connect( $server[0], $server[1] );
       }
-      return array( $memcache_obj, md5( $bin . $key ) );
+    }
+    if ( $memcache_obj ) {
+      return array( $memcache_obj, $hash );
     }
   }
 
-  // Fallback to disk cache.
-  return realpath( TI_CACHE_DIRECTORY . '/' . md5( $bin ) . md5( $key ) );
+  $filepath = realpath( TI_CACHE_DIRECTORY );
+  if ( $filepath ) {
+    return $filepath . '/' . $hash;
+  }
+  else {
+    $filepath = TI_PATH_APP . '/' . TI_CACHE_DIRECTORY;
+    if ( is_dir($filepath) || mkdir( $filepath, 0644, TRUE ) ) {
+      return realpath( $filepath ) . '/' . $hash;
+    }
+  }
+  return sys_get_temp_dir() . '/' . $hash;
 }
 
 /**
