@@ -604,20 +604,20 @@ function po_to_array($file = '') {
       if ( $line{0} == '#' ) {
         continue;
       }
-      if ( strpos($line, 'msgid  ') === 0 ) {
-        $last_msgid = trim(substr($line, 6), '" ');
+      if ( strpos($line, 'msgid ') === 0 ) {
+        $last_msgid = unquotes( substr( $line, 6 ) );
         $is_msgid = TRUE;
       }
       elseif ( strpos($line, 'msgstr ' ) === 0 ) {
-        $array[$last_msgid] = trim( substr($line, 7), '" ' );
+        $array[$last_msgid] = unquotes( substr( $line, 7 ) );
         $is_msgid = FALSE;
       }
       else {
         if ( $is_msgid ) {
-          $last_msgid .= NL . trim( $line, '" ' );
+          $last_msgid .= NL . unquotes( $line );
         }
-        else {
-          $array[$last_msgid] .= NL . trim( $line, '" ' );
+        elseif ($last_msgid) {
+          $array[$last_msgid] .= NL . unquotes( $line );
         }
       }
     }
@@ -659,19 +659,20 @@ function load_locale($locale = '') {
   $_LOCALE_STRINGS = FALSE;
 
   if ( $localepath ) {
-    if ( is_readable( $localepath . '/'. $locale . '/' . $locale . TI_EXT_INCLUDES ) ) {
-      include $localepath . '/'. $locale . '/' . $locale . TI_EXT_INCLUDES;
+    $locale_mo = realpath( $localepath . '/' . $locale . '/LC_MESSAGES/' . $locale . '.mo' );
+    $locale_po = realpath( $localepath . '/' . $locale . '/' . $locale . '.po' );
+    $locale_php = realpath( $localepath . '/' . $locale . '/' . $locale . TI_EXT_INCLUDES );
+    if ( $locale_php && is_readable( $locale_php ) ) {
+      include $locale_php;
     }
-    if ( extension_loaded( 'gettext' ) ) {
-      if ( bindtextdomain( $locale, $localepath ) ) {
-        textdomain( $locale );
-        bind_textdomain_codeset( $locale, 'UTF-8' );
-        $_LOCALE_STRINGS = TRUE;
-        return TRUE;
-      }
+    if ( $locale_mo && extension_loaded( 'gettext' ) && is_readable( $locale_mo ) && bindtextdomain( $locale, $localepath ) ) {
+      textdomain( $locale );
+      bind_textdomain_codeset( $locale, 'UTF-8' );
+      $_LOCALE_STRINGS = TRUE;
+      return TRUE;
     }
-    elseif ( is_readable( $localepath . '/' . $locale . '/' . $locale . '.po' )) {
-      $_LOCALE_STRINGS = po_to_array( $localepath . '/' . $locale . '/' . $locale . '.po' );
+    elseif ( $locale_po && is_readable( $locale_po ) ) {
+      $_LOCALE_STRINGS = po_to_array( $locale_po );
       return TRUE;
     }
   }
@@ -696,8 +697,6 @@ function load_locale($locale = '') {
  *   });
  * ?>
  *
- * @fire __
- *
  * @param string $string
  *   localized string
  *
@@ -706,16 +705,15 @@ function load_locale($locale = '') {
 function __($string = '') {
   global $_LOCALE_STRINGS;
   if ( $_LOCALE_STRINGS === TRUE ) {
-    $localized = _($string);
+    $localized = _( $string );
   }
-  elseif ( is_array($_LOCALE_STRINGS) && isset($_LOCALE_STRINGS[$string])) {
+  elseif ( isset( $_LOCALE_STRINGS[$string] ) ) {
     $localized = $_LOCALE_STRINGS[$string];
   }
   else {
     $localized = $string;
   }
-  $localized = do_hook( '__', $string, $localized );
-  return $localized;
+  return do_hook( '__', $localized, $string );
 }
 
 /**
@@ -2106,13 +2104,13 @@ function has_hook($hook_name) {
  *
  * @param string $key
  * @param mixed $data
- * @param string $bin
  * @param int $expire
+ * @param string $bin
  *
  * @return bool
  */
-function cache_set($key = '', $data = NULL, $bin = 'default', $expire = 0) {
-  $cache_obj = cache_obj( $key, $bin );
+function cache_set($key = '', $data = NULL, $expire = 0, $bin = 'default') {
+  $cache_obj = _cache_obj( $key, $bin );
   if ( is_string( $cache_obj ) ) {
     $data = array( 'expire' => ($expire ? time() + $expire : 0), 'data' => $data );
     return file_put_contents( $cache_obj, serialize( $data ) ) !== FALSE;
@@ -2136,16 +2134,16 @@ function cache_set($key = '', $data = NULL, $bin = 'default', $expire = 0) {
  * @return mixed
  */
 function cache_get($key = '', $bin = 'default') {
-  $cache_obj = cache_obj( $key, $bin );
+  $cache_obj = _cache_obj( $key, $bin );
   if ( is_string( $cache_obj ) ) {
-    $data = unserialize( file_get_contents( $cache_obj ) );
-    if ( $data['expire'] == 0 || $data['expire'] > time() ) {
-      return $data['data'];
+    if ( is_readable( $cache_obj ) ) {
+      $data = unserialize( file_get_contents( $cache_obj ) );
+      if ( $data['expire'] == 0 || $data['expire'] > time() ) {
+        return $data['data'];
+      }
     }
-    else {
-      cache_delete( $key, $bin );
-      return FALSE;
-    }
+    cache_delete( $key, $bin );
+    return FALSE;
   }
   elseif ( is_array( $cache_obj ) ) {
     return call_user_func_array( 'memcache_get', $cache_obj );
@@ -2164,9 +2162,9 @@ function cache_get($key = '', $bin = 'default') {
  * @return bool
  */
 function cache_delete($key = '', $bin = 'default') {
-  $cache_obj = cache_obj( $key, $bin );
+  $cache_obj = _cache_obj( $key, $bin );
   if ( is_string( $cache_obj ) ) {
-    return unlink( $cache_obj );
+    return file_exists( $cache_obj ) && unlink( $cache_obj );
   }
   elseif ( is_array( $cache_obj ) ) {
     return call_user_func_array( 'memcache_delete', $cache_obj );
@@ -2182,12 +2180,14 @@ function cache_delete($key = '', $bin = 'default') {
  * or if Memcache is not installed or configured a filepath,
  * for disk cache cid.
  *
+ * @access private
+ *
  * @param string $key
  * @param string $bin
  *
  * @return array|string
  */
-function cache_obj($key, $bin) {
+function _cache_obj($key, $bin) {
 
   static $memcache_obj = NULL;
 
@@ -2217,7 +2217,7 @@ function cache_obj($key, $bin) {
   }
   else {
     $filepath = TI_PATH_APP . '/' . TI_CACHE_DIRECTORY;
-    if ( is_dir($filepath) || mkdir( $filepath, 0644, TRUE ) ) {
+    if ( is_dir($filepath) || mkdir( $filepath, 0754, TRUE ) ) {
       return realpath( $filepath ) . '/' . $hash;
     }
   }
@@ -2233,6 +2233,40 @@ function cache_obj($key, $bin) {
  */
 function esc_attr($string = '') {
   return htmlspecialchars( CAST_TO_STRING($string), ENT_QUOTES );
+}
+
+/**
+ * Unquote string (remove string wrapped in quotes `, ', "
+ * and context openclosing quotes “” )
+ *
+ * <?php
+ *   echo unquotes('"Hello World!"');
+ *   // Hello World!
+ *
+ *   echo unquotes('"Hello');
+ *   // "Hello
+ *
+ *   echo unquotes('`col1`');
+ *   // col1
+ * ?>
+ *
+ * @param $string
+ *
+ * @return string
+ */
+function unquotes($string = '') {
+  $string = trim( $string );
+  $lc = substr( $string, -1 );
+  if ( ( $string{0} == '`' && $lc == '`' )
+    || ( $string{0} == '"' && $lc == '"' )
+    || ( $string{0} == '\'' && $lc == '\'' )
+    || ( $string{0} == '“' && $lc == '”' )
+  ) {
+    return substr( $string, 1, -1 );
+  }
+  else {
+    return $string;
+  }
 }
 
 /**
@@ -2893,6 +2927,9 @@ function alternator($arg) {
  *
  * @param int $len
  * @param string $charlist
+ *   predefined patterns 'a-z' (lowercase alphabet),
+ *   'A-Z' (uppercase alphabet), '0-9' (numbers)
+ *   also accept and other external chars like '#' etc..
  *
  * @return string
  */
@@ -4532,14 +4569,14 @@ if ( !defined( 'TI_DISABLE_BOOT' )) {
   // @fire shutdown
   register_shutdown_function( 'do_hook', 'shutdown' );
 
+  // Load locale after init hook is processed, so user can stop or change it.
+  // @fire init_locale
+  load_locale( do_hook( 'init_locale', TI_LOCALE ) );
+
   // Do the init hook, ofcourse it is the same as executing code,
   // in the autoloaded file, but with the hook is more elegance way.
   // @fire init
   do_hook( 'init' );
-
-  // Load locale after init hook is processed, so user can stop or change it.
-  // @fire init_locale
-  load_locale( do_hook( 'init_locale', TI_LOCALE ) );
 
   // Let boot the app.
   load_page( $_SERVER['REQUEST_URI'], FALSE );
