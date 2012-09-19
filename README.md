@@ -38,6 +38,26 @@ The example here demonstrate how to build a simple Hello World app with one cont
               <li> class-someclass.php </li>
             </ul>
           </li>
+          <li>
+            locale
+            <ul>
+              <li>
+                bg_BG
+                <ul>
+                  <li> bg_BG.php </li>
+                  <li> bg_BG.po </li>
+                  <li>
+                    LC_MESSAGES
+                    <ul>
+                      <li> bg_BG.mo </li>
+                    </ul>
+                  </li>
+                </ul>
+              </li>
+              <li> somehelper.php </li>
+              <li> class-someclass.php </li>
+            </ul>
+          </li>
           <li> <a href="#app__applicationphp">__application.php</a> </li>
         </ul>
       </li>
@@ -115,8 +135,9 @@ The example here demonstrate how to build a simple Hello World app with one cont
 // Autoload this file (<TI_PATH_APP>/TI_AUTOLOAD_FILE) on bootstrap
 //define( 'TI_AUTOLOAD_FILE',         '__application.php' );
 
-// Default directory where ti-framework stores the cache
-//define( 'TI_FOLDER_CACHE',         'cache' );
+// ti-framework cache configuration
+//define( 'TI_FOLDER_DIRECTORY',      'cache' );
+//define( 'TI_CACHE_MEMCACHE',        'localhost:11211, 127.0.0.2:11211, 127.0.0.3' );
 
 // Setup databases
 
