@@ -54,8 +54,6 @@ The example here demonstrate how to build a simple Hello World app with one cont
                   </li>
                 </ul>
               </li>
-              <li> somehelper.php </li>
-              <li> class-someclass.php </li>
             </ul>
           </li>
           <li> <a href="#app__applicationphp">__application.php</a> </li>

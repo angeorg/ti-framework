@@ -2954,30 +2954,18 @@ function randstr($len = 4, $charlist = 'a-zA-Z0-9') {
 /**
  * Convert size to byte format.
  *
- * @param int $num
+ * @param int $size
  * @param int $precision
  *
  * @return string
  */
-function byte_format($num = 0, $precision = 2) {
-  if ($num < 1024) {
-    return sprintf(__('%s b'), round( $num, $precision ));
+function byte_format($size = 0, $precision = 2) {
+  $unit = array( 'b' ,'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB' );
+  while( $size >= 1024) {
+    $size /= 1024;
+    array_shift( $unit );
   }
-  elseif ($num < 1048576) {
-    return sprintf(__('%s KB'), round( $num / 1024, $precision ));
-  }
-  elseif ($num < 1073741824) {
-    return sprintf(__('%s MB'), round( $num / 1048576, $precision ));
-  }
-  elseif ($num < 1099511627776) {
-    return sprintf(__('%s GB'), round( $num / 1073741824, $precision ));
-  }
-  elseif ($num < 1125899906842624) {
-    return sprintf(__('%s TB'), round( $num / 1099511627776, $precision ));
-  }
-  else {
-    return sprintf(__('%s PB'), round( $num / 1125899906842624, $precision ));
-  }
+  return round( $size, $precision) . array_shift( $unit );
 }
 
 /**
@@ -3065,7 +3053,7 @@ function path_to_assoc($path = '', $offset = 0) {
  */
 function assoc_to_path($array = array()) {
   $path = array();
-  foreach ( CAST_TO_ARRAY($array) as $key => $val ) {
+  foreach ( CAST_TO_ARRAY( $array ) as $key => $val ) {
     $path[] = $key;
     $path[] = $val;
   }
@@ -3082,7 +3070,7 @@ function assoc_to_path($array = array()) {
  * @return string
  */
 function text_pretty_format($string = '') {
-  $string = strtr($string, array(
+  $string = strtr( $string, array(
     '---' => '&#8212;&#8212;',
     '--' => '&#8212;',
     '...' => '&#133;',
@@ -3093,7 +3081,7 @@ function text_pretty_format($string = '') {
     '(c)' => '&#169',
     '(r)' => '&#174',
     '$' => '&#36;',
-  ));
+  ) );
   $string = preg_replace( '#\"([^\"]*)\"#', '&ldquo;$1&rdquo;', $string );
   $string = preg_replace( '#\'([^\']*)\'#', '&lsquo;$1&rsquo;', $string );
   return do_hook( 'text_pretty_format', $string );
@@ -3111,7 +3099,7 @@ function text_pretty_format($string = '') {
 function excerpt($string = '', $limit = 100, $end_char = '&#8230;') {
   $string = CAST_TO_STRING($string);
   preg_match( '/^\s*+(?:\S++\s*+){1,' . CAST_TO_INT($limit) . '}/', $string, $matches );
-  if ( strlen($string) == strlen($matches[0]) ) {
+  if ( strlen($string) == strlen( $matches[0] ) ) {
     $end_char = '';
   }
   unset( $string );
@@ -3627,37 +3615,29 @@ class TI_Database extends PDO {
       case 'sqlite':
       case 'sqlite2':
         $querystr = 'PRAGMA TABLE_INFO( ' . $this->tableName( $table ) . ')';
-        foreach ( $this->query($querystr)->fetchAll() as $column ) {
-          $columns[$column->name] = $column->type;
-        }
+        $query = $this->query($querystr)->fetchAll();
         break;
 
       case 'mysql':
       case 'pgsql':
-        $querystr = 'SELECT column_name, column_type FROM information_schema.columns WHERE table_name = ?';
+        $querystr = 'SELECT column_name AS name, column_type AS type FROM information_schema.columns WHERE table_name = ?';
         $query = $this->query( $querystr, array( $this->prefix . $table ));
-        foreach ( $query->fetchAll() as $column ) {
-          $columns[$column->column_name] = $column->column_type;
-        }
         break;
 
       case 'interbase':
         $querystr = 'SELECT "RDB$FIELD_NAME" AS "name", "RDB$FIELD_SOURCE" AS "type" FROM "RDB$RELATION_FIELDS" WHERE "RDB$RELATION_NAME" = ?;';
         $query = $this->query( $querystr, array( $this->prefix . $table ));
-        foreach ( $query->fetchAll() as $column ) {
-          $columns[$column->name] = $column->type;
-        }
         break;
 
       case 'mssql':
-        $querystr = 'SELECT COLUMN_NAME, DATA_TYPE FROM INFORMATION_SCHEMA.Columns where TABLE_NAME = ?;';
+        $querystr = 'SELECT COLUMN_NAME AS name, DATA_TYPE AS type FROM INFORMATION_SCHEMA.Columns where TABLE_NAME = ?;';
         $query = $this->query( $querystr, array( $this->prefix . $table ));
-        foreach ( $query->fetchAll() as $column ) {
-          $columns[$column->COLUMN_NAME] = $column->COLUMN_TYPE;
-        }
         break;
 
       default: return FALSE;
+    }
+    foreach ( $query->fetchAll() as $column ) {
+      $columns[$column->column_name] = $column->column_type;
     }
     $this->_table_columns_cache[$table] = $columns;
     return $columns;
