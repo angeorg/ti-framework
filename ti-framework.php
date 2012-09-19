@@ -996,7 +996,7 @@ endif;
  * @return string
  */
 function string_sanitize($string = '') {
-  return str_replace( array(
+  $string = str_replace( array(
       "\0", "\xc2\xad", "\xcc\xb7", "\xcc\xb8", "\xe1\x85\x9F", "\xe1\x85\xA0",
       "\xe2\x80\x80", "\xe2\x80\x81", "\xe2\x80\x82", "\xe2\x80\x83", "\xe2\x80\x84",
       "\xe2\x80\x85", "\xe2\x80\x86", "\xe2\x80\x87", "\xe2\x80\x88", "\xe2\x80\x89",
@@ -1004,6 +1004,14 @@ function string_sanitize($string = '') {
       "\xe2\x80\xab", "\xe2\x80\xac", "\xe2\x80\xad", "\xe2\x80\xae", "\xe2\x80\xaf",
       "\xe2\x81\x9f", "\xe3\x80\x80", "\xe3\x85\xa4", "\xef\xbb\xbf", "\xef\xbe\xa0",
       "\xef\xbf\xb9", "\xef\xbf\xba", "\xef\xbf\xbb", "\xE2\x80\x8D"), '', $string);
+  $search = array(
+      '@<script[^>]*?>.*?</script>@si',   // Strip out javascript
+      '@<[\/\!]*?[^<>]*?>@si',            // Strip out HTML tags
+      '@<style[^>]*?>.*?</style>@siU',    // Strip style tags properly
+      '@<![\s\S]*?--[ \t\n\r]*>@'         // Strip multi-line comments
+  );
+  $string = preg_replace($search, '', $string);
+  return $string;
 }
 
 if ( function_exists( 'is_utf8' ) ):
@@ -2233,6 +2241,28 @@ function _cache_obj($key, $bin) {
  */
 function esc_attr($string = '') {
   return htmlspecialchars( CAST_TO_STRING($string), ENT_QUOTES );
+}
+
+/**
+ * Generate base64 encoded image tags, suitable for embeding in a single document.
+ *
+ * @param string $file
+ * @param bool $include_html_tags
+ *
+ * @return string
+ */
+function image_file_embed($file, $include_html_tags = TRUE) {
+  $file = realpath( $file );
+  if ( $file ) {
+    $data = base64_encode( file_get_contents( $file ) );
+    $data = 'data: '.filemime($file).';base64,'.$data;
+    if ($include_html_tags) {
+      return '<img src="' . $data . '" />';
+    }
+    else {
+      return $data;
+    }
+  }
 }
 
 /**
